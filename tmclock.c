@@ -9,7 +9,7 @@
  *  -- Howard Chu, August 1 1988      hyc@umix.cc.umich.edu, umix!hyc
  */
 
-/* $Header: /cvsroot/arc/arc/tmclock.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $ */
+/* $Header: /cvsroot/arc/arc/tmclock.c,v 1.3 2003/10/31 02:31:24 highlandsun Exp $ */
 
 /* Julian day number of the Unix* clock's origin, 01 Jan 1970. */
 #define JD1970 2440587L
@@ -35,7 +35,7 @@ struct tm *tm;
 	    (mon = tm -> tm_mon + 1) < 1 || mon > 12 ||
 	    (year = tm -> tm_year) < 1 || year > 10000 )
 	return ( -1L );
-    if ( year < 100 )
+    if ( year < 1583 )
 	year += CENTURY * 100;
 
     if ( mon == 1 || mon == 2 )
