@@ -1,6 +1,6 @@
 /*
  * Miscellaneous routines to get ARC running on non-MSDOS systems...
- * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $ 
+ * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.3 2003/10/31 02:32:19 highlandsun Exp $ 
  */
 
 #include <stdio.h>
@@ -188,7 +188,7 @@ makefnam(rawfn, template, result)
 	return ((char *) &result[0]);
 }
 
-#if	MSDOS || SYSV
+#if	NEED_ALPHASORT
 
 int
 alphasort(dirptr1, dirptr2)
@@ -233,7 +233,7 @@ gcdir(dirname)
 	char           *dirname;
 
 {
-	char           *getwd();
+	char           *getcwd();
 #if	GEMDOS
 	int             drv;
 	char           *buf;
@@ -242,7 +242,7 @@ gcdir(dirname)
 		dirname = (char *) malloc(1024);
 
 #if	!GEMDOS
-	getwd(dirname);
+	getcwd(dirname, 1024);
 #else
 	buf = dirname;
 	*buf++ = (drv = Dgetdrv()) + 'A';

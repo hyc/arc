@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcdos.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcdos.c,v 1.3 2003/10/31 02:32:19 highlandsun Exp $
  */
 
 /*
@@ -34,10 +34,12 @@
 #include <sys/time.h>
 #else	
 #include <time.h>		/* Sys V. Bleah. */
+#if	NEED_TIMEVAL
 struct	timeval {
 	long	tv_sec;
 	long	tv_usec;
 };
+#endif
 #endif	/* BSD vs SYSV */
 #endif
 

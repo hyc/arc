@@ -1,4 +1,4 @@
-# $Header: /cvsroot/arc/arc/Makefile,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+# $Header: /cvsroot/arc/arc/Makefile,v 1.3 2003/10/31 02:32:19 highlandsun Exp $
 #       Makefile for portable ARC
 #
 # Originals from Dan Lanciani, James Turner, and others...
@@ -13,8 +13,8 @@ SRCDIR =
 HEADER = $(SRCDIR)arc.h $(SRCDIR)arcs.h
 
 # Add a ".TTP" suffix to the executable files on an ST.
-PROG = .ttp
-#PROG =
+#PROG = .ttp
+PROG =
 
 # SYSTEM defines your operating system:
 # MSDOS for IBM PCs or other MSDOS machines
@@ -26,8 +26,14 @@ PROG = .ttp
 # NEEDMEMSET if your C library does not have the memset() routine and/or
 # your system include doesn't have <memory.h> (Most current systems don't
 # need this.)
-SYSTEM = -DGEMDOS=1 -fstrength-reduce -fomit-frame-pointer -finline-functions -fdefer-pop -mpcrel
+# NEED_TIMEVAL if you need struct timeval defined.
+# NEED_ALPHASORT if your C library doesn't provide it.
+#
+# On Solaris, use -DSYSV=1 -DNEED_ALPHASORT and set SYSVOBJ=scandir.o
+# (See the Sysvarcstuf shar file)
+#SYSTEM = -DGEMDOS=1 -fstrength-reduce -fomit-frame-pointer -finline-functions -fdefer-pop -mpcrel
 #SYSTEM = -DBSD=1
+SYSTEM = -DSYSV=1
 
 OPT = -O
 # For MWC 3.0 on the Atari ST, use:
@@ -35,14 +41,14 @@ OPT = -O
 CFLAGS = $(OPT) $(SYSTEM)
 
 # GNU's gcc is very nice, if you've got it. Otherwise just cc.
-CC = cgcc -mshort -mbaserel
-#CC = cc
+#CC = cgcc -mshort -mbaserel
+CC = cc
 
 # tmclock is only needed on Unix systems...
-#TMCLOCK = tmclock.o
+TMCLOCK = tmclock.o
 
 # Integer-only stdio routines for Atari ST.
-LIBS=-liio16
+#LIBS=-liio16
 
 # Files needed for System V 
 #SYSVOBJ =	getwd.o rename.o scandir.o utimes.o
