@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.3 2005/03/13 15:44:00 k_reimer Exp $
  */
 
 /*
@@ -19,6 +19,7 @@
  * Language: Computer Innovations Optimizing C86
  */
 #include <stdio.h>
+#include <string.h>
 #include "arc.h"
 
 VOID	rempath(), openarc(), closearc(), arcdie();

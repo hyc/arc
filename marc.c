@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.3 2004/11/06 11:16:26 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.4 2005/03/13 15:44:00 k_reimer Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -23,6 +23,7 @@
 	 Computer Innovations Optimizing C86
 */
 #include <stdio.h>
+#include <string.h>
 #include "arc.h"
 
 #if	UNIX
@@ -48,7 +49,7 @@ main(nargs,arg)			       /* system entry point */
 int nargs;			       /* number of arguments */
 char *arg[];			       /* pointers to arguments */
 {
-    char *makefnam();		       /* filename fixup routine */
+    char *makefnam();
     char *envfind();
 #if	!_MTS
     char *arctemp2, *mktemp();		/* temp file stuff */
@@ -312,6 +313,7 @@ int n;				       /* number of entry to expand */
     char buf[100];		       /* input buffer */
     int x;			       /* index */
     char *p = lst[n]+1;		       /* filename pointer */
+    char *makefnam();
 
     if(*p)			       /* use name if one was given */
     {	 makefnam(p,".CMD",buf);
