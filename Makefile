@@ -1,4 +1,4 @@
-# $Header: /cvsroot/arc/arc/Makefile,v 1.3 2003/10/31 02:32:19 highlandsun Exp $
+# $Header: /cvsroot/arc/arc/Makefile,v 1.4 2003/10/31 02:32:51 highlandsun Exp $
 #       Makefile for portable ARC
 #
 # Originals from Dan Lanciani, James Turner, and others...
@@ -20,7 +20,7 @@ PROG =
 # MSDOS for IBM PCs or other MSDOS machines
 # GEMDOS for Atari ST (Predefined by MWC, so you don't need to define it.)
 # BSD for Berkeley Unix
-# SYSV for AT&T System V Unix
+# SYSV for AT&T System V Unix or GNU/Linux
 # (_MTS for Michigan Terminal System, which requires a different makefile)
 # (_MTS also requires one of USEGFINFO or USECATSCAN for directory search)
 # NEEDMEMSET if your C library does not have the memset() routine and/or
