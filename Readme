@@ -1,3 +1,31 @@
+Notes for ARC 5.21e					October 31, 1991
+
+	ARC 5.21 for Unix is currently at patch level 6. The code provided
+here has been used on 4.3 BSD based Unix systems and on the Atari ST. (The
+GNU C compiler, version 1.40, was used to make the ST version. It should
+still compile with Mark Williams C, but I haven't bothered to try it.) The
+current version is over twice as fast as previous releases, for all file
+compression and decompression operations. It also fixes longstanding bugs
+in the squash code and in the tmclock DST code.
+ 
+	The Arcinfo file describes the ARC 5.xx directory format. The 6.xx
+format contains additional information that is not supported here.
+
+	System V support in the shar file Sysvarcstuf was provided by Jon
+Zeeff, Janet Walz, and Rich Salz. You will probably also need the dirent
+directory library written by Doug Gwyn; this can be obtained from uunet or
+many other comp.sources.unix archive sites.
+
+	The tmclock.c file was stolen from Jef Poskanzer's tws library,
+as distributed in PHOON, PHase of the mOON, and slightly hacked by me.
+
+	The man page was originally from Leo Wilson, with updates by me.
+
+         /                 Howard Chu
+   ___  /_ , ,_.     Jet Propulsion Laboratory
+       / /(_/(__     hyc@hanauma.jpl.nasa.gov
+           /
+
 Notes for ARC 5.21                                        June 6, 1988
  
 This program is based on the MSDOS ARC program, version 5.21, plus
@@ -54,7 +82,6 @@ in combination with a RAMdisk. Highly recommended for floppy users.
 (Unfortunately, you can only take advantage of this when running some
 form of command shell that allows setting environment variables. Thus,
 you won't see any speed gains when running from the desktop.)
- 
  
 That about covers things. The enclosed documentation is taken directly
 from the MSDOS distribution of ARC. Unless specified differently here,
