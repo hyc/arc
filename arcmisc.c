@@ -1,11 +1,16 @@
 /*
  * Miscellaneous routines to get ARC running on non-MSDOS systems...
- * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.1 1988/06/13 19:17:00 highlandsun Exp $ 
+ * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $ 
  */
 
 #include <stdio.h>
 #include <ctype.h>
 #include "arc.h"
+
+#include <string.h>
+#if	BSD
+#include <strings.h>
+#endif
 
 #if	MSDOS
 #include <dir.h>
@@ -13,11 +18,11 @@
 #endif
 
 #if	GEMDOS
+#include <types.h>
 #include <osbind.h>
 #include <stat.h>
-char           *index(), *rindex();
 
-void 
+VOID 
 exitpause()
 {
 	while (Cconis())
@@ -53,50 +58,74 @@ chdir(dirname)
 
 #if	UNIX
 #include <sys/types.h>
-#include <sys/dir.h>
-#include <sys/stat.h>
-	int	rename();
-#endif
-
 #if	SYSV
 #include <dirent.h>
 #define DIRECT dirent
 #else
+#include <sys/dir.h>
 #define DIRECT direct
 #endif
+#include <sys/stat.h>
+	int	rename(), unlink();
+#endif
 
-char           *strcpy(), *strcat(), *malloc();
-int             strlen();
+#if	NEEDMEMSET
+char	*
+memset(s, c, n)		/* This came from SVR2? */
+	char	*s;
+	int	c, n;
+{
+	register int i;
+	for(i=0;i<n;i++)
+		s[i]=c;
+	return(s);
+}
+#else
+#include <memory.h>
+#endif
+
+#ifndef	__STDC__
+char		*malloc();
+#ifndef _AIX
+int		free();
+#endif
+#endif
+int             match();
 
 int
 move(oldnam, newnam)
 	char           *oldnam, *newnam;
 {
 	FILE           *fopen(), *old, *new;
+#if	!_MTS
 	struct stat     oldstat;
-	char           *strcpy();
-	void		filecopy();
+#endif
+	VOID		filecopy();
 #if	GEMDOS
 	if (Frename(0, oldnam, newnam))
 #else
 	if (rename(oldnam, newnam))
 #endif
+#if	!_MTS
 	{
 		if (stat(oldnam, &oldstat))	/* different partition? */
 			return (-1);
-		old = fopen(oldnam, "rb");
+		old = fopen(oldnam, OPEN_R);
 		if (old == NULL)
 			return (-1);
-		new = fopen(newnam, "wb");
+		new = fopen(newnam, OPEN_W);
 		if (new == NULL)
 			return (-1);
 		filecopy(old, new, oldstat.st_size);
-		unlink(oldnam);
+		return(unlink(oldnam));
 	}
 	return 0;
+#else
+	return(-1);
+#endif
 }
 
-static void
+static VOID
 _makefn(source, dest)
 	char           *source;
 	char           *dest;
@@ -104,8 +133,6 @@ _makefn(source, dest)
 	int             j;
 #if	MSDOS
 	char	       *setmem();
-#else
-	char	       *memset();
 #endif
 
 	setmem(dest, 17, 0);	/* clear result field */
@@ -126,11 +153,11 @@ makefnam(rawfn, template, result)
 	char           *template;	/* the template data */
 	char           *result;	/* where to place the result */
 {
-	char            et[17], er[17], rawbuf[STRLEN], *i, *rindex();
+	char            et[17], er[17], rawbuf[STRLEN], *i;
 
 	*rawbuf = 0;
 	strcpy(rawbuf, rawfn);
-#if	MTS
+#if	_MTS
 	i = rawbuf;
 	if (rawbuf[0] == tmpchr[0]) {
 		i++;
@@ -172,7 +199,7 @@ alphasort(dirptr1, dirptr2)
 
 #endif
 
-void
+VOID
 upper(string)
 	char           *string;
 {
@@ -183,8 +210,8 @@ upper(string)
 			*p = toupper(*p);
 }
 /* VARARGS1 */
-void
-abort(s, arg1, arg2, arg3)
+VOID
+arcdie(s, arg1, arg2, arg3)
 	char           *s;
 {
 	fprintf(stderr, "ARC: ");
@@ -199,7 +226,7 @@ abort(s, arg1, arg2, arg3)
 	exit(1);
 }
 
-#if	!MTS
+#if	!_MTS
 
 char           *
 gcdir(dirname)
@@ -235,9 +262,12 @@ dir(filename)		/* get files, one by one */
 {
 #if	GEMDOS
 	static int      Nnum = 0;
+#if	__GNUC__
+#define	d_fname	dta_name	/* Wish these libraries would agree on names */
+#define DMABUFFER	_DTA
+#endif
 	static DMABUFFER dbuf, *saved;
 	char           *name;
-
 	if (Nnum == 0) {	/* first call */
 		saved = (DMABUFFER *) Fgetdta();
 		Fsetdta(&dbuf);
@@ -272,7 +302,6 @@ dir(filename)		/* get files, one by one */
 #endif				/* UNIX */
 	int             fmatch();
 	static int      Nnum = 0, ii;
-	char		*rindex();
 
 
 	if (Nnum == 0) {	/* first call */
@@ -330,9 +359,8 @@ char           *
 dir(filepattern)
 	char           *filepattern;	/* template or NULL */
 {
-	char           *malloc(), *index();
 #if	USECATSCAN
-	fortran void    catscan(), fileinfo();
+	fortran VOID    catscan(), fileinfo();
 
 	struct catname {
 		short           len;
@@ -377,15 +405,15 @@ dir(filepattern)
 	else {
 		char           *k;
 
-		k = index(catreturn.name, ' ');
+/*		k = index(catreturn.name, ' ');
 		if (k)
 			*k = 0;
-		else {
+		else {		This seems unnecessary now	*/
 			j = catreturn.actlen;
 			catreturn.name[j] = 0;
-		}
+/*		}		*/
 		k = catreturn.name;
-		if (catreturn.name[0] == tmpchr[0])
+		if (*k == tmpchr[0])
 			k++;
 		else if ((k = index(catreturn.name, sepchr[0])))
 			k++;
@@ -397,7 +425,7 @@ dir(filepattern)
 		return (i);
 	}
 #else
-	fortran void    gfinfo();
+	fortran VOID    gfinfo();
 	static char     gfname[24];
 	static char     pattern[20];
 	static int      gfdummy[2] = {
@@ -443,7 +471,7 @@ int
 unlink(path)
 	char           *path;	/* name of file to delete */
 {
-	fortran void    destroy();
+	fortran VOID    destroy();
 	int             RETCODE;
 
 	char            name[258];

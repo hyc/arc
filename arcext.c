@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcext.c,v 1.1 1988/06/13 19:06:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcext.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -21,12 +21,23 @@
 #if	!MSDOS
 #include <ctype.h>
 #endif
+#include <string.h>
+#if	BSD
+#include <strings.h>
+#endif
 
-void	openarc(), closearc(), setstamp();
-int	free(), match(), readhdr(), unpack();
-char	*strcpy(), *strcat();
+VOID	openarc(), closearc(), setstamp();
+int	match(), readhdr(), unpack();
+static	VOID	extfile();
 
-void
+#ifndef	__STDC__
+char	*malloc();
+#ifndef _AIX
+VOID	free();
+#endif
+#endif
+
+VOID
 extarc(num, arg, prt)		/* extract files from archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -35,18 +46,16 @@ extarc(num, arg, prt)		/* extract files from archive */
 	struct heads    hdr;	/* file header */
 	int             save;	/* true to save current file */
 	int             did[MAXARG];/* true when argument was used */
-	char           *i, *rindex();	/* string index */
-	char          **name, *malloc();	/* name pointer list,
-						 * allocator */
+	char           *i;	/* string index */
+	char          **name; 	/* name pointer list */
 	int             n;	/* index */
-	void            extfile();
 
 	name = (char **) malloc(num * sizeof(char *));	/* get storage for name
 							 * pointers */
 
 	for (n = 0; n < num; n++) {	/* for each argument */
 		did[n] = 0;	/* reset usage flag */
-#if	!MTS
+#if	!_MTS
 		if (!(i = rindex(arg[n], '\\')))	/* find start of name */
 			if (!(i = rindex(arg[n], '/')))
 				if (!(i = rindex(arg[n], ':')))
@@ -98,7 +107,7 @@ extarc(num, arg, prt)		/* extract files from archive */
 	free(name);
 }
 
-void
+static VOID
 extfile(hdr, path, prt)		/* extract a file */
 	struct heads   *hdr;	/* pointer to header data */
 	char           *path;	/* pointer to path name */
@@ -107,7 +116,7 @@ extfile(hdr, path, prt)		/* extract a file */
 	FILE           *f, *fopen();	/* extracted file, opener */
 	char            buf[STRLEN];	/* input buffer */
 	char            fix[STRLEN];	/* fixed name buffer */
-	char           *i, *rindex();	/* string index */
+	char           *i;	/* string index */
 
 	if (prt) {		/* printing is much easier */
 		unpack(arc, stdout, hdr);	/* unpack file from archive */
@@ -115,7 +124,7 @@ extfile(hdr, path, prt)		/* extract a file */
 		return;		/* see? I told you! */
 	}
 	strcpy(fix, path);	/* note path name template */
-#if	!MTS
+#if	!_MTS
 	if (*path) {
 	if (!(i = rindex(fix, '\\')))	/* find start of name */
 		if (!(i = rindex(fix, '/')))
@@ -154,12 +163,12 @@ extfile(hdr, path, prt)		/* extract a file */
 				}
 		}
 	}
-#if	!MTS
-	if (!(f = fopen(fix, "wb")))
+#if	!_MTS
+	if (!(f = fopen(fix, OPEN_W)))
 #else
 	{
 		fortran         create();
-		void		memset();
+		VOID		memset();
 		char            c_name[256];
 		struct crsize {
 			short           maxsize, cursize;
@@ -175,7 +184,7 @@ extfile(hdr, path, prt)		/* extract a file */
 		create(c_name, &c_size, c_vol, &c_type);
 	}
 	if (image) {
-		f = fopen(fix, "wb");
+		f = fopen(fix, OPEN_W);
 	} else
 		f = fopen(fix, "w");
 	if (!f)
@@ -188,11 +197,12 @@ extfile(hdr, path, prt)		/* extract a file */
 		fseek(arc, hdr->size, 1);
 		return;
 	}
+
 	/* now unpack the file */
 
 	unpack(arc, f, hdr);	/* unpack file from archive */
 	fclose(f);		/* all done writing to file */
-#if	!MTS
+#if	!_MTS
 	setstamp(fix, hdr->date, hdr->time);	/* use filename for stamp */
 #endif
 }

@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.1 1988/06/13 05:43:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCSVC
@@ -18,73 +18,87 @@
 */
 #include <stdio.h>
 #include "arc.h"
-#if	MTS
+#if	_MTS
 #include <mts.h>
 #endif
 
-void	abort(), setstamp();
+VOID	arcdie(), setstamp();
 int	unlink();
 
-void
+VOID
 openarc(chg)			/* open archive */
 	int             chg;	/* true to open for changes */
 {
 	FILE           *fopen();/* file opener */
 
-	if (!(arc = fopen(arcname, "rb"))) {
+	if (!(arc = fopen(arcname, OPEN_R))) {
 		if (chg) {
 			if (note)
 				printf("Creating new archive: %s\n", arcname);
 		}
 		else
-			abort("Archive not found: %s", arcname);
+			arcdie("Archive not found: %s", arcname);
 	}
-#if	MTS	/* allow reading archives of max MTS record length */
-	else {
-		char *buffer, *malloc();
+#if	_MTS	/* allow reading archives of max MTS record length */
+	{
+		char *buf, *malloc();
 		int inlen;
 		struct GDDSECT *region;
 
-		region=gdinfo(arc->_fd);
+		region=gdinfo(arc->_fd._fdub);
 		inlen=region->GDINLEN;
-		buffer=malloc(inlen);
-		setbuf(arc, buffer);
-		arc->_bufsiz=inlen;
+		buf=malloc(inlen);
+		setbuffer(arc, buf, inlen);
 	}
 #endif
 	if (chg) {		/* if opening for changes */
-		if (!(new = fopen(newname, "wb")))
-			abort("Cannot create archive copy: %s", newname);
+		if (!(new = fopen(newname, OPEN_W)))
+			arcdie("Cannot create archive copy: %s", newname);
 
 	changing = chg;		/* note if open for changes */
 	}
 }
 
-void
+VOID
 closearc(chg)			/* close an archive */
 	int             chg;	/* true if archive was changed */
 {
 	if (arc) {		/* if we had an initial archive */
 		fclose(arc);
+#if	!_MTS
 		if (kludge)	/* kludge to update timestamp */
-#if	!MTS
 			setstamp(arcname, olddate, oldtime);
 #endif
 	}
 	if (chg) {		/* if things have changed */
 		fclose(new);	/* close the new copy */
 		if (arc) {	/* if we had an original archive */
+#if      _MTS
+                                {
+                                 fortran VOID permit();
+                                 char what[FNLEN+2];
+/* copy permissions  */          char who[FNLEN+6];
+/* of old archive to */          int how,whotyp,wholen,info;
+/* new copy...       */          strcpy(what, newname);
+                                 strcat(what," ");
+                                 whotyp=9;
+                                 sprintf(who,"like %s",arcname);
+                                 wholen=strlen(who);
+                                 info=0;
+                                 permit(what,&how,&whotyp,&wholen,who,&info);
+                                }
+#endif
 			if (keepbak) {	/* if a backup is wanted */
 				unlink(bakname);	/* erase any old copies */
 				if (move(arcname, bakname))
-					abort("Cannot rename %s to %s", arcname, bakname);
+					arcdie("Cannot rename %s to %s", arcname, bakname);
 				printf("Keeping backup archive: %s\n", bakname);
 			} else if (unlink(arcname))
-				abort("Cannot delete old archive: %s", arcname);
+				arcdie("Cannot delete old archive: %s", arcname);
 		}
 		if (move(newname, arcname))
-			abort("Cannot move %s to %s", newname, arcname);
-#if	!MTS
+			arcdie("Cannot move %s to %s", newname, arcname);
+#if	!_MTS
 		setstamp(arcname, arcdate, arctime);
 #endif
 	}
@@ -134,10 +148,20 @@ static short      crctab[] =	/* CRC lookup table */
  0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 };
 
+/*
+ * Update a CRC check on the given buffer.
+ */
+
 int
-addcrc(crc, c)			/* update a CRC check */
-	int             crc;	/* running CRC value */
-	unsigned char   c;	/* character to add */
+crcbuf(crc, len, buf)
+	register int	crc;	/* running CRC value */
+	register u_int	len;
+	register u_char	*buf;
 {
-	return ((crc >> 8) & 0x00ff) ^ crctab[(crc ^ c) & 0x00ff];
+	register u_int	i;
+
+	for (i=0; i<len; i++)
+		crc = ((crc >> 8) & 0xff) ^ crctab[(crc ^ *buf++) & 0xff];
+	
+	return (crc);
 }

@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.1 1988/06/02 00:57:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -21,10 +21,12 @@
 #include <stdio.h>
 #include "arc.h"
 
-void	rempath(), openarc(), closearc(), abort();
+VOID	rempath(), openarc(), closearc(), arcdie();
+int	readhdr(), match(), unpack();
+static	VOID	runfile();
 char	*strcat();
 
-void
+VOID
 runarc(num, arg)		/* run file from archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -33,7 +35,6 @@ runarc(num, arg)		/* run file from archive */
 	char           *makefnam();	/* filename fixer */
 	char            buf[STRLEN];	/* filename buffer */
 	FILE           *fopen();/* file opener */
-	int             runfile();
 	char	       *dummy[2];
 
 	dummy[0]="dummy";
@@ -56,7 +57,7 @@ runarc(num, arg)		/* run file from archive */
 	closearc(0);		/* close archive after changes */
 }
 
-static          int
+static  VOID
 runfile(hdr, num, arg)		/* run a file */
 	struct heads   *hdr;	/* pointer to header data */
 	int             num;	/* number of arguments */
@@ -119,9 +120,9 @@ runfile(hdr, num, arg)		/* run a file */
 
 	if (warn)
 		if (tmp = fopen(buf, "r"))
-			abort("Temporary file %s already exists", buf);
-	if (!(tmp = fopen(buf, "wb")))
-		abort("Unable to create temporary file %s", buf);
+			arcdie("Temporary file %s already exists", buf);
+	if (!(tmp = fopen(buf, OPEN_W)))
+		arcdie("Unable to create temporary file %s", buf);
 
 	if (note)
 		printf("Invoking file: %s\n", hdr->name);

@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.1 1988/06/06 06:04:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -25,30 +25,45 @@
 #include <stdio.h>
 #include "arc.h"
 
+#if	UNIX
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
+
+#ifndef	__STDC__
+char *calloc(), *malloc(), *realloc(); /* memory managers */
+#endif
+VOID	arcdie();
+static VOID expandlst(), merge();
+
 FILE *src;			       /* source archive */
 char srcname[STRLEN];		       /* source archive name */
+char *pinbuf;				/* block input buffer */
 
 static char **lst;		       /* files list */
 static int lnum;		       /* length of files list */
 
-
+int
 main(nargs,arg)			       /* system entry point */
 int nargs;			       /* number of arguments */
 char *arg[];			       /* pointers to arguments */
 {
     char *makefnam();		       /* filename fixup routine */
-    char *calloc();		       /* memory manager */
     char *envfind();
-#if	!MTS
+#if	!_MTS
     char *arctemp2, *mktemp();		/* temp file stuff */
 #endif
 #if	GEMDOS
-    void exitpause();
+    VOID exitpause();
 #endif
     int n;			       /* index */
+#if	UNIX
+    struct	stat	sbuf;
+#endif
+
 
     if(nargs<3)
-    {	 printf("MARC - Archive merger, Version 5.21, created on 04/22/87 at 15:05:10\n");
+    {	 printf("MARC - Archive merger, Version 5.21i, created on 11/25/92 at 14:40:55\n");
 /*	 printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 	 printf(" ALL RIGHTS RESERVED\n\n");
 	 printf("Please refer all inquiries to:\n\n");
@@ -85,7 +100,7 @@ char *arg[];			       /* pointers to arguments */
     }
 
 	/* see where temp files go */
-#if	!MTS
+#if	!_MTS
 	arctemp = calloc(1, STRLEN);
 	if (!(arctemp2 = envfind("ARCTEMP")))
 		arctemp2 = envfind("TMPDIR");
@@ -95,8 +110,14 @@ char *arg[];			       /* pointers to arguments */
 		if (arctemp[n - 1] != CUTOFF)
 			arctemp[n] = CUTOFF;
 	}
+#if	UNIX
+	else	strcpy(arctemp, "/tmp/");
+#endif
 #if	!MSDOS
-	strcat(arctemp, mktemp("AXXXXXX"));
+	{
+		static char tempname[] = "AXXXXXX";
+		strcat(arctemp, mktemp(tempname));
+	}
 #else
 	strcat(arctemp, "$ARCTEMP");
 #endif
@@ -109,20 +130,27 @@ char *arg[];			       /* pointers to arguments */
 	arctemp[0] = tmpchr[0];
 #endif
 
-    makefnam(arg[1],".arc",arcname);   /* fix up archive names */
-    makefnam(arg[2],".arc",srcname);
+#if	UNIX
+	if (!stat(arg[1],&sbuf))
+		strcpy(arcname,arg[1]);
+	else
+		makefnam(arg[1],".arc",arcname);
+	if (!stat(arg[2],&sbuf))
+		strcpy(srcname,arg[2]);
+	else
+		makefnam(arg[2],".arc",srcname);
+#else
+    makefnam(arg[1],".ARC",arcname);   /* fix up archive names */
+    makefnam(arg[2],".ARC",srcname);
 /*	makefnam(".$$$",arcname,newname);*/
+#endif
 	sprintf(newname,"%s.arc",arctemp);
 
-#if	!UNIX
-    upper(arcname); upper(srcname); upper(newname);
-#endif
-
-    arc = fopen(arcname,"rb");	       /* open the archives */
-    if(!(src=fopen(srcname,"rb")))
-	 abort("Cannot read source archive %s",srcname);
-    if(!(new=fopen(newname,"wb")))
-	 abort("Cannot create new archive %s",newname);
+    arc = fopen(arcname,OPEN_R);	       /* open the archives */
+    if(!(src=fopen(srcname,OPEN_R)))
+	 arcdie("Cannot read source archive %s",srcname);
+    if(!(new=fopen(newname,OPEN_W)))
+	 arcdie("Cannot create new archive %s",newname);
 
     if(!arc)
 	 printf("Creating new archive %s\n",arcname);
@@ -146,6 +174,8 @@ char *arg[];			       /* pointers to arguments */
 	      else n++;
 	 }
     }
+    if (!(pinbuf = malloc(MYBUF)))
+	arcdie("Not enough memory for input buffer.");
 
     merge(lnum,lst);		       /* merge desired files */
 
@@ -155,9 +185,9 @@ char *arg[];			       /* pointers to arguments */
 
     if(arc)			       /* make the switch */
 	 if(unlink(arcname))
-	      abort("Unable to delete old copy of %s",arcname);
+	      arcdie("Unable to delete old copy of %s",arcname);
     if(move(newname,arcname))
-	 abort("Unable to rename %s to %s",newname,arcname);
+	 arcdie("Unable to rename %s to %s",newname,arcname);
 
     setstamp(arcname,arcdate,arctime);     /* new arc matches newest file */
 
@@ -167,6 +197,7 @@ char *arg[];			       /* pointers to arguments */
     return nerrs;
 }
 
+static	VOID
 merge(nargs,arg)		       /* merge two archives */
 int nargs;			       /* number of filename templates */
 char *arg[];			       /* pointers to names */
@@ -265,11 +296,11 @@ int ver;			       /* header version */
     filecopy(f,new,hdr->size);	       /* copy over the data */
 }
 
-static expandlst(n)		       /* expand an indirect reference */
+static VOID
+expandlst(n)			       /* expand an indirect reference */
 int n;				       /* number of entry to expand */
 {
     FILE *lf, *fopen();		       /* list file, opener */
-    char *malloc(), *realloc();	       /* memory managers */
     char buf[100];		       /* input buffer */
     int x;			       /* index */
     char *p = lst[n]+1;		       /* filename pointer */
@@ -278,7 +309,7 @@ int n;				       /* number of entry to expand */
     {	 makefnam(p,".CMD",buf);
 	 upper(buf);
 	 if(!(lf=fopen(buf,"r")))
-	      abort("Cannot read list of files in %s",buf);
+	      arcdie("Cannot read list of files in %s",buf);
     }
     else lf = stdin;		       /* else use standard input */
 
@@ -288,7 +319,7 @@ int n;				       /* number of entry to expand */
 
     while(fscanf(lf,"%99s",buf)>0)     /* read in the list */
     {	 if(!(lst=(char **) realloc(lst,(lnum+1)*sizeof(char *))))
-	      abort("too many file references");
+	      arcdie("too many file references");
 
 	 lst[lnum] = malloc(strlen(buf)+1);
 	 strcpy(lst[lnum],buf);	       /* save the name */

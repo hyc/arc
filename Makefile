@@ -1,11 +1,8 @@
-#
-#       Makefile for Hack-attack 1.3
-#       VAX 11/780 BSD4.2 "ARC" utility
+# $Header: /cvsroot/arc/arc/Makefile,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+#       Makefile for portable ARC
 #
 # Originals from Dan Lanciani, James Turner, and others...
-#
-# Modified to support squashing, also added targets for the time routine
-# library.  -- Howard Chu, hyc@umix.cc.umich.edu, 4-11-88
+# This Makefile supports Atari ST and all Unix versions.
 #
 # I put SRCDIR on a real disk on the ST, but copy the makefile to a
 # RAMdisk and compile from there. Makes things go a bit quicker...
@@ -13,86 +10,105 @@
 # specified correctly. e.g., setenv SRCDIR='d:\src\arc\'
 SRCDIR = 
 
-HEADER = $(SRCDIR)arc.h
+HEADER = $(SRCDIR)arc.h $(SRCDIR)arcs.h
 
 # Add a ".TTP" suffix to the executable files on an ST.
-#PROG = .ttp
-PROG =
+PROG = .ttp
+#PROG =
 
-# TWSLIB is only needed on Unix systems. Likewise for TWHEAD.
-#TWSLIB =
-#TWHEAD =
-TWSLIB = libtws.a
-TWHEAD = tws.h
+# SYSTEM defines your operating system:
+# MSDOS for IBM PCs or other MSDOS machines
+# GEMDOS for Atari ST (Predefined by MWC, so you don't need to define it.)
+# BSD for Berkeley Unix
+# SYSV for AT&T System V Unix
+# (_MTS for Michigan Terminal System, which requires a different makefile)
+# (_MTS also requires one of USEGFINFO or USECATSCAN for directory search)
+# NEEDMEMSET if your C library does not have the memset() routine and/or
+# your system include doesn't have <memory.h> (Most current systems don't
+# need this.)
+SYSTEM = -DGEMDOS=1 -fstrength-reduce -fomit-frame-pointer -finline-functions -fdefer-pop -mpcrel
+#SYSTEM = -DBSD=1
 
+OPT = -O
 # For MWC 3.0 on the Atari ST, use:
 #CFLAGS = -VCOMPAC -VPEEP
-CFLAGS = -O
+CFLAGS = $(OPT) $(SYSTEM)
+
+# GNU's gcc is very nice, if you've got it. Otherwise just cc.
+CC = cgcc -mshort -mbaserel
+#CC = cc
+
+# tmclock is only needed on Unix systems...
+#TMCLOCK = tmclock.o
+
+# Integer-only stdio routines for Atari ST.
+LIBS=-liio16
+
+# Files needed for System V 
+#SYSVOBJ =	getwd.o rename.o scandir.o utimes.o
+SYSVOBJ =
 
 OBJS = arc.o arcadd.o arccode.o arccvt.o arcdata.o arcdel.o arcdos.o \
 arcext.o arcio.o arclst.o arclzw.o arcmatch.o arcpack.o arcrun.o \
-arcsq.o arcsqs.o arcsvc.o arctst.o arcunp.o arcusq.o arcmisc.o
+arcsq.o arcsvc.o arctst.o arcunp.o arcusq.o arcmisc.o $(SYSVOBJ)
 
-MOBJ = marc.o arcdata.o arcdos.o arcio.o arcmatch.o arcmisc.o
+MOBJ = marc.o arcdata.o arcdos.o arcio.o arcmatch.o arcmisc.o $(SYSVOBJ)
 
-arc$(PROG):	$(OBJS) $(TWSLIB)
-	cc -o arc$(PROG) $(OBJS) $(TWSLIB)
+all:	arc$(PROG) marc$(PROG)
 
-marc$(PROG):	$(MOBJ) $(TWSLIB)
-	cc -o marc$(PROG) $(MOBJ) $(TWSLIB)
+arc$(PROG):	$(OBJS) $(TMCLOCK)
+	$(CC) $(OPT) -o arc$(PROG) $(OBJS) $(TMCLOCK) $(LIBS)
+
+marc$(PROG):	$(MOBJ) $(TMCLOCK)
+	$(CC) $(OPT) -o marc$(PROG) $(MOBJ) $(TMCLOCK) $(LIBS)
 
 clean:
-	-rm *.o arc$(PROG) marc$(PROG) $(TWSLIB)
+	-rm *.o arc$(PROG) marc$(PROG)
 
-$(HEADER):	$(SRCDIR)arcs.h
-	touch $(HEADER)
+arc.o:	$(SRCDIR)arc.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arc.c
+marc.o:	$(SRCDIR)marc.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)marc.c
+arcadd.o:	$(SRCDIR)arcadd.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcadd.c
+arccode.o:	$(SRCDIR)arccode.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arccode.c
+arccvt.o:	$(SRCDIR)arccvt.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arccvt.c
+arcdata.o:	$(SRCDIR)arcdata.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcdata.c
+arcdel.o:	$(SRCDIR)arcdel.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcdel.c
+arcdir.o:	$(SRCDIR)arcdir.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcdir.c
+arcdos.o:	$(SRCDIR)arcdos.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcdos.c
+arcext.o:	$(SRCDIR)arcext.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcext.c
+arcio.o:	$(SRCDIR)arcio.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcio.c
+arclst.o:	$(SRCDIR)arclst.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arclst.c
+arclzw.o:	$(SRCDIR)arclzw.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arclzw.c
+arcmatch.o:	$(SRCDIR)arcmatch.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcmatch.c
+arcmisc.o:	$(SRCDIR)arcmisc.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcmisc.c
+arcpack.o:	$(SRCDIR)arcpack.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcpack.c
+arcrun.o:	$(SRCDIR)arcrun.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcrun.c
+arcsq.o:	$(SRCDIR)arcsq.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcsq.c
+arcsvc.o:	$(SRCDIR)arcsvc.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcsvc.c
+arctst.o:	$(SRCDIR)arctst.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arctst.c
+arcunp.o:	$(SRCDIR)arcunp.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcunp.c
+arcusq.o:	$(SRCDIR)arcusq.c	$(HEADER)
+	$(CC) $(CFLAGS) -c $(SRCDIR)arcusq.c
 
-arc.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arc.c
-marc.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)marc.c
-arcadd.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcadd.c
-arccode.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arccode.c
-arccvt.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arccvt.c
-arcdata.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcdata.c
-arcdel.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcdel.c
-arcdir.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcdir.c
-arcdos.o:	$(HEADER) $(TWHEAD)
-	cc $(CFLAGS) -c $(SRCDIR)arcdos.c
-arcext.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcext.c
-arcio.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcio.c
-arclst.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arclst.c
-arclzw.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arclzw.c
-arcmatch.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcmatch.c
-arcmisc.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcmisc.c
-arcpack.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcpack.c
-arcrun.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcrun.c
-arcsq.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcsq.c
-arcsqs.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcsqs.c
-arcsvc.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcsvc.c
-arctst.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arctst.c
-arcunp.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcunp.c
-arcusq.o:	$(HEADER)
-	cc $(CFLAGS) -c $(SRCDIR)arcusq.c
-
-libtws.a:
-	make -f Make.tws libtws.a
+tmclock.o:	$(SRCDIR)tmclock.c
+	$(CC) $(CFLAGS) -c $(SRCDIR)tmclock.c

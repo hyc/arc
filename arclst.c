@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arclst.c,v 1.1 1988/06/01 23:06:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arclst.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCLST
@@ -20,10 +20,11 @@
 #include <stdio.h>
 #include "arc.h"
 
-void            rempath(), openarc(), closearc();
+VOID            rempath(), openarc(), closearc();
 int             readhdr(), match();
+static	VOID	lstfile();
 
-void
+VOID
 lstarc(num, arg)		/* list files in archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -33,7 +34,6 @@ lstarc(num, arg)		/* list files in archive */
 	int             did[MAXARG];	/* true when argument was used */
 	long            tnum, tlen, tsize;	/* totals */
 	int             n;	/* index */
-	void            lstfile();
 
 	tnum = tlen = tsize = 0;/* reset totals */
 
@@ -119,7 +119,7 @@ lstarc(num, arg)		/* list files in archive */
 	}
 }
 
-void
+static	VOID
 lstfile(hdr)			/* tell about a file */
 	struct heads   *hdr;	/* pointer to header data */
 {
@@ -127,7 +127,7 @@ lstfile(hdr)			/* tell about a file */
 	int             hh, mm;	/* parts of a time */
 
 	static char    *mon[] =	/* month abbreviations */
-	{
+	{"???",			/* For month == 0 */
 	 "Jan", "Feb", "Mar", "Apr",
 	 "May", "Jun", "Jul", "Aug",
 	 "Sep", "Oct", "Nov", "Dec"
@@ -140,6 +140,8 @@ lstfile(hdr)			/* tell about a file */
 
 	yr = (hdr->date >> 9) & 0x7f;	/* dissect the date */
 	mo = (hdr->date >> 5) & 0x0f;
+	if (mo > 12)		/* just in case... */
+		mo = 0;
 	dy = hdr->date & 0x1f;
 
 	hh = (hdr->time >> 11) & 0x1f;	/* dissect the time */
@@ -181,7 +183,7 @@ lstfile(hdr)			/* tell about a file */
 			printf("  ---");
 		printf("  %8ld  ", hdr->size);
 	}
-	printf("%2d %3s %02d", dy, mon[mo - 1], (yr + 80) % 100);
+	printf("%2d %3s %02d", dy, mon[mo], (yr + 80) % 100);
 
 	if (bose)
 		printf("  %2d:%02d%c  %04x",

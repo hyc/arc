@@ -53,7 +53,7 @@ utility, which was created by System Enhancement
 Associates, Inc. in October of 1986.
 
 
-        TABLE OF CONTENTS
+       TABLE OF CONTENTS
 
 
 
@@ -108,7 +108,7 @@ Site licenses  ...................................  34
 
 
 
-          INTRODUCTION
+         INTRODUCTION
 
 
 
@@ -163,7 +163,7 @@ channel, where products can be introduced at low cost.
 
 
 ARC                                              Page 1
- If user supported software works, then everyone will
+If user supported software works, then everyone will
 benefit.  The user will benefit by receiving quality
 products at low cost, and by being able to "test
 drive" software thoroughly before purchasing it.  The
@@ -218,7 +218,7 @@ never be larger than the original file.
 
 
 ARC                                              Page 2
-            USING ARC
+           USING ARC
 
 
 
@@ -273,7 +273,7 @@ commands:
 
 
 ARC                                              Page 3
- Following is a brief summary of the available ARC
+Following is a brief summary of the available ARC
 options, which may alter how a command works:
 
     b   = retain backup copy of archive
@@ -328,7 +328,7 @@ options, which may alter how a command works:
 
 
 ARC                                              Page 4
-          ARC COMMANDS
+         ARC COMMANDS
 
 
 
@@ -383,7 +383,7 @@ since they were last archived, then you would type:
 
 
 ARC                                              Page 5
- If you have a bunch of files in your current
+If you have a bunch of files in your current
 directory, with backup copies being stored in an
 archive named "SAFE.ARC", then if you wanted to make
 sure that every file in the archive is the latest
@@ -438,7 +438,7 @@ only the actual file name is stored in the archive.
 
 
 ARC                                              Page 6
- ARC will never add an archive to itself, nor will it
+ARC will never add an archive to itself, nor will it
 add the temporary copy or a backup copy of the
 archive.
 
@@ -493,7 +493,7 @@ could type:
 
 
 ARC                                              Page 7
- If you give more than one path for a file, then only
+If you give more than one path for a file, then only
 the first one is used.  For example, if you typed:
 
     ARC x junk a:trash.txt b:trash.txt
@@ -548,7 +548,7 @@ like this:
 
 
 ARC                                              Page 8
- "Length" is the unpacked file length.  In other words,
+"Length" is the unpacked file length.  In other words,
 it is the number of bytes of disk space which the file
 would take up if it were extracted.
 
@@ -603,7 +603,7 @@ occupying while in the archive.
 
 
 ARC                                              Page 9
- "Time" is the time of last modification, and is
+"Time" is the time of last modification, and is
 associated with the date of last modification.
 
 "CRC" is the CRC check value which has been stored
@@ -658,7 +658,7 @@ than 256k.
 
 
 ARC                                             Page 10
- In practice, the file to be run is extracted, run, and
+In practice, the file to be run is extracted, run, and
 then deleted.  In other words, the above example is
 equivalent to:
 
@@ -713,7 +713,7 @@ CRC value.
 
 
 ARC                                             Page 11
- For example, if you just received an archive named
+For example, if you just received an archive named
 "JUNK.ARC" over a phone line, and you want to make
 sure that you received it properly, you could type:
 
@@ -768,7 +768,7 @@ you could type:
 
 
 ARC                                             Page 12
-           ARC OPTIONS
+          ARC OPTIONS
 
 
 
@@ -823,7 +823,7 @@ though I can't imagine why you'd want to.
 
 
 ARC                                             Page 13
- BACKUP RETENTION
+BACKUP RETENTION
 
 When ARC changes an archive (during an Add, Move,
 Update, Freshen, Delete, or Convert) it creates a new
@@ -878,7 +878,7 @@ backup, then the older backup copy is deleted.
 
 
 ARC                                             Page 14
- MESSAGE SUPPRESSION
+MESSAGE SUPPRESSION
 
 ARC prints three types of messages: warnings,
 comments, and errors.
@@ -933,7 +933,7 @@ the "W" command, but that will also suppress any
 
 
 ARC                                             Page 15
- warnings about other things, like failed CRC checks
+warnings about other things, like failed CRC checks
 and such.
 
 The "O" (Overwrite) option suppresses *only* the warning
@@ -988,7 +988,7 @@ earlier case of extracting all the ".BAS" files from
 
 
 ARC                                             Page 16
- ENCRYPTION/DECRYPTION
+ENCRYPTION/DECRYPTION
 
 Archive entries may be encrypted and decrypted by
 using the "G" (Garble) option.  The Garble option
@@ -1043,7 +1043,7 @@ data.
 
 
 ARC                                             Page 17
-         RAMDISK SUPPORT
+        RAMDISK SUPPORT
 
 
 
@@ -1098,7 +1098,7 @@ extension matches that of the file being run.
 
 
 ARC                                             Page 18
-              MARC
+             MARC
 
 
 
@@ -1153,7 +1153,7 @@ brief directions in its use.
 
 
 ARC                                             Page 19
-              ARCE
+             ARCE
 
 
 
@@ -1196,7 +1196,7 @@ If you run ARCE with no arguments at all, then it will
 give you a brief reminder of how to use it.
 
 
-NOTICE:NOTICE: ARCE is the copyrighted property of Vernon D.
+NOTICE:NOTICE: ARCE is the copyrighted property of Vernon D.
         Buerg and Wayne Chin.  It is included on the
         ARC program disk as a service to ARC users.
 
@@ -1208,7 +1208,7 @@ NOTICE:NOTICE: ARCE is the copyrighted property of Vernon D.
 
 
 ARC                                             Page 20
-         VERSION NUMBERS
+        VERSION NUMBERS
 
 
 
@@ -1263,7 +1263,7 @@ you probably shouldn't bother.
 
 
 ARC                                             Page 21
-  COMMON QUESTIONS AND ANSWERS
+ COMMON QUESTIONS AND ANSWERS
 
 
 
@@ -1318,7 +1318,7 @@ A: ARC updates are distributed through normal
 
 
 ARC                                             Page 22
- Q: Can I use ARC to distribute my public domain or
+Q: Can I use ARC to distribute my public domain or
    shareware program?
 
 A: Yes, of course.
@@ -1336,7 +1336,7 @@ Q: I'm a commercial user.  Why should I pay for
    shareware that others get for free?
 
 A: Because you cannot credibly plead poverty.
-              ___   Shareware, all shareware, is an attempt to develop
+              ___   Shareware, all shareware, is an attempt to develop
    a new marketing channel to the benefit of everyone.
    You can still "test drive" shareware for a short
    period, but if you decide to use it in your
@@ -1373,7 +1373,7 @@ A: It would needlessly complicate ARC, both internally
 
 
 ARC                                             Page 23
-      MAINTENANCE CONTRACTS
+     MAINTENANCE CONTRACTS
 
 
 
@@ -1428,7 +1428,7 @@ updates to ARC as they come out.
 
 
 ARC                                             Page 24
-        REVISION HISTORY
+       REVISION HISTORY
 
 
 
@@ -1483,7 +1483,7 @@ increased disk space and reduced transmission time.
 
 
 ARC                                             Page 25
- CHANGES IN VERSION 4.1
+CHANGES IN VERSION 4.1
 
 Lempel-Zev coding has been improved somewhat by
 performing non-repeat compression on the data before
@@ -1538,7 +1538,7 @@ version 4.1.
 
 
 ARC                                             Page 26
- CHANGES IN VERSION 4.4
+CHANGES IN VERSION 4.4
 
 The temporary file introduced in version 4.3
 occasionally caused problems for people who had not
@@ -1593,7 +1593,7 @@ corrected.
 
 
 ARC                                             Page 27
- CHANGES IN VERSION 5.0
+CHANGES IN VERSION 5.0
 
 The Move command used to delete the files as it went.
 It now waits until it is finished updating the
@@ -1648,7 +1648,7 @@ a standard going.
 
 
 ARC                                             Page 28
- ARC is now using a different variation of Lempel-Zev
+ARC is now using a different variation of Lempel-Zev
 coding, courtesy of Kent Williams, who found it on
 USENET and adapted it to the IBM PC.  The new method
 differs from the old in several respects.  The most
@@ -1703,7 +1703,7 @@ path names.
 
 
 ARC                                             Page 29
- Dana Montgomery found the upper limit on how many
+Dana Montgomery found the upper limit on how many
 files can be added to an archive.  There's always been
 an upper limit, but it depends on memory, and used to
 be larger than anyone could possibly want (knock on
@@ -1758,7 +1758,7 @@ files to an archive.
 
 
 ARC                                             Page 30
-   PROGRAM HISTORY AND CREDITS
+  PROGRAM HISTORY AND CREDITS
 
 
 
@@ -1813,7 +1813,7 @@ for calculating the CRC 16 bit polynomial.
 
 
 ARC                                             Page 31
- Terry A. Welch, whose article "A Technique for High
+Terry A. Welch, whose article "A Technique for High
 Performance Data Compression", IEEE Computer Vol 17 No
 6 (June 1984) seems to have started all the research
 on Lempel-Zev coding.
@@ -1868,7 +1868,7 @@ And many, many others whom we could not identify.
 
 
 ARC                                             Page 32
-         BULLETIN BOARDS
+        BULLETIN BOARDS
 
 
 
@@ -1923,7 +1923,7 @@ distribute ARC.
 
 
 ARC                                             Page 33
-          SITE LICENSES
+         SITE LICENSES
 
 
 
@@ -1978,7 +1978,7 @@ There is a $50 minimum on all orders.
 
 
 ARC                                             Page 34
-              SITE LICENSE APPLICATION
+             SITE LICENSE APPLICATION
 
 
 
@@ -2038,7 +2038,7 @@ is granted under the following terms:
     Company
 
 
-                    ORDER FORM
+                   ORDER FORM
 
 
 

@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arccode.c,v 1.1 1988/06/01 20:16:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arccode.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -9,12 +9,12 @@
  * 
  * (C) COPYRIGHT 1985 by System Enhancement Associates; ALL RIGHTS RESERVED
  * 
- * By:  Thom Henderson
+ * By:	Thom Henderson
  * 
  * Description: This file contains the routines used to encrypt and decrypt data
  * in an archive.  The encryption method is nothing fancy, being just a
  * routine XOR, but it is used on the packed data, and uses a variable length
- * key.  The end result is something that is in theory crackable, but I'd
+ * key.	 The end result is something that is in theory crackable, but I'd
  * hate to try it.  It should be more than sufficient for casual use.
  * 
  * Language: Computer Innovations Optimizing C86
@@ -24,20 +24,24 @@
 
 static char    *p;		/* password pointer */
 
-void
+VOID
 setcode()
 {				/* get set for encoding/decoding */
 	p = password;		/* reset password pointer */
 }
 
-unsigned char
-code(c)				/* encode some character */
-	char            c;	/* character to encode */
+VOID
+codebuf(buf, len)		/* encrypt a buffer */
+	reg char       *buf;
+	u_int		len;
 {
-	if (p) {		/* if password is in use */
-		if (!*p)	/* if we reached the end */
-			p = password;	/* then wrap back to the start */
-		return c ^ *p++;/* very simple here */
-	} else
-		return c;	/* else no encryption */
+	reg u_int	i;
+	reg char       *pasptr = p;
+
+	for (i = 0; i < len; i++) {
+		if (!*pasptr)
+			pasptr = password;
+		*buf++ ^= *pasptr++;
+	}
+	p = pasptr;
 }

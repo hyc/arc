@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcunp.c,v 1.1 1988/06/18 08:13:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcunp.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -18,47 +18,48 @@
  */
 #include <stdio.h>
 #include "arc.h"
-#if	MTS
-#include <ctype.h>
+#if	_MTS
+#include <mts.h>
 #endif
 
-void	setcode(), init_usq(), init_ucr(), decomp(), sqdecomp();
-void	abort(), putc_tst();
-int	getc_usq(), getc_ucr(), addcrc();
+VOID	setcode(), init_usq(), init_ucr(), decomp();
+VOID	arcdie(), codebuf();
+
+#include "proto.h"
 
 /* stuff for repeat unpacking */
 
 #define DLE 0x90		/* repeat byte flag */
 
-static int      state;		/* repeat unpacking state */
+extern u_char   state;		/* repeat unpacking state */
+extern int	lastc;
 
 /* repeat unpacking states */
 
 #define NOHIST 0		/* no relevant history */
 #define INREP 1			/* sending a repeated value */
 
-static short    crcval;		/* CRC check value */
-static long     size;		/* bytes to read */
+short    crcval;		/* CRC check value */
+long     stdlen;		/* bytes to read */
 #if	!DOS
 static int	gotcr;		/* got a carriage return? */
 #endif
+
+extern u_char	*pinbuf, *pakbuf, *outbuf;
 
 int
 unpack(f, t, hdr)		/* unpack an archive entry */
 	FILE           *f, *t;	/* source, destination */
 	struct heads   *hdr;	/* pointer to file header data */
 {
-	int             c;	/* one char of stream */
-	void            putc_unp();
-	void            putc_ncr();
-	int             getc_unp();
+	u_int		len;
 
 	/* setups common to all methods */
 #if	!DOS
 	gotcr = 0;
 #endif
 	crcval = 0;		/* reset CRC check value */
-	size = hdr->size;	/* set input byte counter */
+	stdlen = hdr->size;	/* set input byte counter */
 	state = NOHIST;		/* initial repeat unpacking state */
 	setcode();		/* set up for decoding */
 
@@ -67,45 +68,57 @@ unpack(f, t, hdr)		/* unpack an archive entry */
 	switch (hdrver) {	/* choose proper unpack method */
 	case 1:		/* standard packing */
 	case 2:
-		while ((c = getc_unp(f)) != EOF)
-			putc_unp((char) c, t);
+		do {
+			len = getb_unp(f);
+			putb_unp(pinbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 3:		/* non-repeat packing */
-		while ((c = getc_unp(f)) != EOF)
-			putc_ncr((unsigned char) c, t);
+		do {
+			len = getb_unp(f);
+			putb_ncr(pinbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 4:		/* Huffman squeezing */
 		init_usq(f);
-		while ((c = getc_usq(f)) != EOF)
-			putc_ncr((unsigned char) c, t);
+		do {
+			len = getb_usq(f);
+			putb_ncr(outbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 5:		/* Lempel-Zev compression */
-		init_ucr(0);
-		while ((c = getc_ucr(f)) != EOF)
-			putc_unp((char) c, t);
+		init_ucr(0, f);
+		do {
+			len = getb_ucr(f);
+			putb_unp(outbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 6:		/* Lempel-Zev plus non-repeat */
-		init_ucr(0);
-		while ((c = getc_ucr(f)) != EOF)
-			putc_ncr((unsigned char) c, t);
+		init_ucr(0, f);
+		do {
+			len = getb_ucr(f);
+			putb_ncr(outbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 7:		/* L-Z plus ncr with new hash */
-		init_ucr(1);
-		while ((c = getc_ucr(f)) != EOF)
-			putc_ncr((unsigned char) c, t);
+		init_ucr(1, f);
+		do {
+			len = getb_ucr(f);
+			putb_ncr(outbuf, len, t);
+		} while (len == MYBUF);
 		break;
 
 	case 8:		/* dynamic Lempel-Zev */
-		decomp(f, t);
+		decomp(0, f, t);
 		break;
 
 	case 9:		/* Squashing */
-		sqdecomp(f, t);
+		decomp(1, f, t);
 		break;
 
 	default:		/* unknown method */
@@ -135,33 +148,43 @@ unpack(f, t, hdr)		/* unpack an archive entry */
  * various housekeeping functions, such as maintaining the CRC check value.
  */
 
-void
-putc_unp(c, t)			/* output an unpacked byte */
-	char            c;	/* byte to output */
-	FILE           *t;	/* file to output to */
+VOID
+putb_unp(buf, len, t)
+	u_char	*buf;
+	u_int	len;
+	FILE	*t;
 {
-	crcval = addcrc(crcval, c);	/* update the CRC check value */
-#if	MTS
-	if (!image)
-		atoe(&c, 1);
+	u_int i, j;
+
+	crcval = crcbuf(crcval, len, buf);
+
+	if (!t)
+		return;
+#if	!DOS
+	if (!image) {
+#if	_MTS
+		atoe(buf, len);
 #endif
-#if	DOS
-	putc_tst(c, t);
-#else
-	if (image)
-		putc_tst(c, t);
-	else {
 		if (gotcr) {
 			gotcr = 0;
-			if (c != '\n')
-				putc_tst('\r', t);
+			if (buf[0] != '\n')
+				putc('\r', t);
 		}
-		if (c == '\r')
+
+		for (i=0,j=0; i<len; i++)
+			if (buf[i] != '\r' || buf[i+1] != '\n')
+				buf[j++] = buf[i];
+		len = j;
+
+		if (buf[len-1] == '\r') {
+			len--;
 			gotcr = 1;
-		else
-			putc_tst(c, t);
+		}
 	}
-#endif
+#endif	/* !DOS */
+	i=fwrite(buf, 1, len, t);
+	if (i != len)
+		arcdie("Write fail");
 }
 
 /*
@@ -176,51 +199,59 @@ putc_unp(c, t)			/* output an unpacked byte */
  * repeat marker.
  */
 
-void
-putc_ncr(c, t)			/* put NCR coded bytes */
-	unsigned char   c;	/* next byte of stream */
-	FILE           *t;	/* file to receive data */
+VOID
+putb_ncr(buf, len, t)		/* put NCR coded bytes */
+	u_char	*buf;
+	u_int	len;
+	FILE	*t;		/* file to receive data */
 {
-	static int      lastc;	/* last character seen */
+	u_char	*pakptr=pakbuf;
+	u_int	i;
 
-	switch (state) {	/* action depends on our state */
-	case NOHIST:		/* no previous history */
-		if (c == DLE)	/* if starting a series */
-			state = INREP;	/* then remember it next time */
-		else
-			putc_unp(lastc = c, t);	/* else nothing unusual */
-		return;
+	for (i=0; i<len; i++) {
+		if (state == INREP) {
+			if (buf[i])
+				while (--buf[i])
+					*pakptr++ = lastc;
+			else
+				*pakptr++ = DLE;
+			state = NOHIST;
+		} else {
+			if (buf[i] != DLE)
+				*pakptr++ = lastc = buf[i];
+			else
+				state = INREP;
+		}
 
-	case INREP:		/* in a repeat */
-		if (c)		/* if count is nonzero */
-			while (--c)	/* then repeatedly ... */
-				putc_unp(lastc, t);	/* ... output the byte */
-		else
-			putc_unp(DLE, t);	/* else output DLE as data */
-		state = NOHIST;	/* back to no history */
-		return;
-
-	default:
-		abort("Bad NCR unpacking state (%d)", state);
+		if (pakptr - pakbuf > MYBUF) {
+			putb_unp(pakbuf, (u_int) (pakptr-pakbuf), t);
+			pakptr = pakbuf;
+		}
 	}
+	putb_unp(pakbuf, (u_int) (pakptr-pakbuf), t);
 }
 
 /*
- * This routine provides low-level byte input from an archive.  This routine
- * MUST be used, as end-of-file is simulated at the end of the archive entry.
+ * This routine reads a buffer of data from an archive.
  */
 
-int
-getc_unp(f)			/* get a byte from an archive */
-	FILE           *f;	/* archive file to read */
+u_int
+getb_unp(f)
+	FILE		*f;
 {
-	register int    xx;
-	unsigned char		code();
+	register u_int len;
 
-	if (!size)		/* if no data left */
-		return EOF;	/* then pretend end of file */
+	if (stdlen) {
+		len = (stdlen < MYBUF) ? stdlen : MYBUF;
 
-	size--;			/* deduct from input counter */
-	xx = getc(f);
-	return code(xx);	/* and return next decoded byte */
+		len = fread(pinbuf, 1, len, f);
+
+		if (password)
+			codebuf(pinbuf, len);
+	
+		stdlen -= len;
+	} else
+		len = 0;
+	
+	return (len);
 }

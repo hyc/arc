@@ -1,47 +1,52 @@
 /*
- * $Header: /cvsroot/arc/arc/arclzw.c,v 1.1 1988/06/02 01:01:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arclzw.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
  * ARC - Archive utility - ARCLZW
- * 
+ *
  * Version 2.03, created on 10/24/86 at 11:46:22
- * 
+ *
  * (C) COPYRIGHT 1985,86 by System Enhancement Associates; ALL RIGHTS RESERVED
- * 
+ *
  * By:  Thom Henderson
- * 
+ *
  * Description: This file contains the routines used to implement Lempel-Zev
  * data compression, which calls for building a coding table on the fly.
  * This form of compression is especially good for encoding files which
  * contain repeated strings, and can often give dramatic improvements over
  * traditional Huffman SQueezing.
- * 
+ *
  * Language: Computer Innovations Optimizing C86
- * 
+ *
  * Programming notes: In this section I am drawing heavily on the COMPRESS
  * program from UNIX.  The basic method is taken from "A Technique for High
  * Performance Data Compression", Terry A. Welch, IEEE Computer Vol 17, No 6
  * (June 1984), pp 8-19.  Also see "Knuth's Fundamental Algorithms", Donald
  * Knuth, Vol 3, Section 6.4.
- * 
+ *
  * As best as I can tell, this method works by tracing down a hash table of code
  * strings where each entry has the property:
- * 
+ *
  * if <string> <char> is in the table then <string> is in the table.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include "arc.h"
 
-void	putc_pak(), abort(), putc_ncr();
-int	getc_unp();
+VOID            arcdie();
 #if	MSDOS
-char	*setmem();
+char           *setmem();
 #else
-char	*memset();
+#if	NEEDMEMSET
+char           *memset();
+#else
+#include <memory.h>
+#endif
 #endif
 
-static void	putcode();
+#include "proto.h"
+static VOID     putcode();
 /* definitions for older style crunching */
 
 #define FALSE    0
@@ -51,45 +56,60 @@ static void	putcode();
 #define EMPTY    0xFFFF
 #define NOT_FND  0xFFFF
 
-static unsigned short inbuf;	/* partial input code storage */
-static int      sp;		/* current stack pointer */
+extern u_char	*pinbuf;
+u_char		*inbeg, *inend;
+u_char          *outbuf;
+u_char          *outbeg, *outend; 
 
-struct entry {		/* string table entry format */
+static int      sp;		/* current stack pointer */
+static int	inflag;
+
+static struct entry {		/* string table entry format */
 	char            used;	/* true when this entry is in use */
-	unsigned char   follower;	/* char following string */
-	unsigned short  next;	/* ptr to next in collision list */
-	unsigned short  predecessor;	/* code for preceeding string */
-};            /* string_tab[TABSIZE];	/* the code string table */
+	u_char           follower;	/* char following string */
+	u_short          next;	/* ptr to next in collision list */
+	u_short          predecessor;	/* code for preceeding string */
+} *string_tab;				/* the code string table */
 
 
 /* definitions for the new dynamic Lempel-Zev crunching */
 
-#define BITS   12		/* maximum bits per code */
-#define HSIZE  5003		/* 80% occupancy */
+#define CRBITS	12		/* maximum bits per code */
+#define CRHSIZE	5003		/* 80% occupancy */
+#define	CRGAP	2048		/* ratio check interval */
+#define	SQBITS	13		/* Squash values of above */
+#define	SQHSIZE	10007
+#define	SQGAP	10000
 #define INIT_BITS 9		/* initial number of bits/code */
+
+static int      Bits;
+static int      Hsize;
+static int      Check_Gap;
 
 static int      n_bits;		/* number of bits/code */
 static int      maxcode;	/* maximum code, given n_bits */
 #define MAXCODE(n)      ((1<<(n)) - 1)	/* maximum code calculation */
-static int      maxcodemax = 1 << BITS;	/* largest possible code (+1) */
+static int      max_maxcode;	/* 1 << BITS; largest possible code (+1) */
 
-static char     buf[BITS];	/* input/output buffer */
+static char     buf[SQBITS];	/* input/output buffer */
 
-static unsigned char lmask[9] =	/* left side masks */
+static u_char    lmask[9] =	/* left side masks */
 {
- 0xff, 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x80, 0x00
+	0xff, 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x80, 0x00
 };
-static unsigned char rmask[9] =	/* right side masks */
+static u_char    rmask[9] =	/* right side masks */
 {
- 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff
+	0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff
 };
 
 static int      offset;		/* byte offset for code output */
 static long     in_count;	/* length of input */
+static int      in_off;		/* where to start reading input */
 static long     bytes_out;	/* length of compressed output */
-static long     bytes_ref;	/* output quality reference */
-static long     bytes_last;	/* output size at last checkpoint */
-static unsigned short ent;
+static long     bytes_last;	/* previous output size */
+static u_short   ent;
+static long     fcode;
+static int      hshift;
 
 /*
  * To save much memory (which we badly need at this point), we overlay the
@@ -98,16 +118,14 @@ static unsigned short ent;
  * safely do this.
  */
 
-extern long     htab[HSIZE];		/* hash code table   (crunch) */
-extern unsigned short codetab[HSIZE];	/* string code table (crunch) */
-static struct	entry *string_tab=(struct entry *)htab;	/* old crunch string table */
+long            *htab;		/* hash code table   (crunch) */
+u_short         *codetab;	/* string code table (crunch) */
 
-static unsigned short *prefix=codetab;	/* prefix code table (uncrunch) */
-static unsigned char *suffix=(unsigned char *)htab;	/* suffix table (uncrunch) */
+static u_short  *prefix;	/* prefix code table (uncrunch) */
+static u_char   *suffix;	/* suffix table (uncrunch) */
 
 static int      free_ent;	/* first unused entry */
-static int      firstcmp;	/* true at start of compression */
-extern unsigned char stack[HSIZE];	/* local push/pop stack */
+u_char          *stack;		/* local push/pop stack */
 
 /*
  * block compression parameters -- after all codes are used up, and
@@ -115,9 +133,9 @@ extern unsigned char stack[HSIZE];	/* local push/pop stack */
  */
 
 static int      clear_flg;
-#define CHECK_GAP 2048		/* ratio check interval */
+static long     ratio;
 static long     checkpoint;
-void            upd_tab();
+VOID            upd_tab();
 
 /*
  * the next two codes should not be changed lightly, as they must not lie
@@ -128,31 +146,47 @@ void            upd_tab();
 
 /*
  * The cl_block() routine is called at each checkpoint to determine if
- * compression would likely improve by resetting the code table.  The method
- * chosen to determine this is based on empirical observation that, in
- * general, every 2k of input data should compress at least as well as the
- * first 2k of input.
+ * compression would likely improve by resetting the code table.
  */
 
-static          void
+static VOID
 cl_block(t)			/* table clear for block compress */
 	FILE           *t;	/* our output file */
 {
-	checkpoint = in_count + CHECK_GAP;
+	long            rat;
 
-	if (bytes_ref) {
-		if (bytes_out - bytes_last > bytes_ref) {
-			setmem(htab, HSIZE * sizeof(long), 0xff);
-			free_ent = FIRST;
-			clear_flg = 1;
-			putcode(CLEAR, t);
-			bytes_ref = 0;
-		}
+	checkpoint = in_count + Check_Gap;
+
+	if (in_count > 0x007fffffL) {	/* shift will overflow */
+		rat = bytes_out >> 8;
+		if (rat == 0)	/* Don't divide by zero */
+			rat = 0x7fffffffL;
+		else
+			rat = in_count / rat;
 	} else
-		bytes_ref = bytes_out - bytes_last;
+		rat = (in_count << 8) / bytes_out;	/* 8 fractional bits */
 
-	bytes_last = bytes_out;	/* remember where we were */
+	if (rat > ratio)
+		ratio = rat;
+	else {
+		ratio = 0;
+		setmem(htab, Hsize * sizeof(long), 0xff);
+		free_ent = FIRST;
+		clear_flg = 1;
+		putcode(CLEAR, t);
+	}
 }
+
+#define FLUSH_BUF(bytes)	\
+do {	bytes_out += bytes;\
+	outbeg += bytes;\
+	if (outend - outbeg < Bits) {\
+		putb_pak(outbuf, (u_int) (bytes_out - bytes_last), t);\
+		bytes_last = bytes_out;\
+		outbeg = outbuf;\
+	}\
+	offset = 0;\
+} while (0)
 
 /*****************************************************************
  *
@@ -169,119 +203,97 @@ cl_block(t)			/* table clear for block compress */
  * fit in it exactly).  When the buffer fills up empty it and start over.
  */
 
-static          void
+static VOID
 putcode(code, t)		/* output a code */
 	int             code;	/* code to output */
 	FILE           *t;	/* where to put it */
 {
 	int             r_off = offset;	/* right offset */
 	int             bits = n_bits;	/* bits to go */
-	char           *bp = buf;	/* buffer pointer */
-	int             n;	/* index */
+	u_char          *bp = outbeg;	/* buffer pointer */
 
-	register int	ztmp;
+	register int    ztmp;
 
-	if (code >= 0) {	/* if a real code *//* Get to the first byte. */
-		bp += (r_off >> 3);
-		r_off &= 7;
+	bp += (r_off >> 3);	/* Get to the first byte. */
+	r_off &= 7;
 
+	/*
+	 * Since code is always >= 8 bits, only need to mask the
+	 * first hunk on the left.
+	 */
+	ztmp = (code << r_off) & lmask[r_off];
+	*bp = (*bp & rmask[r_off]) | ztmp;
+	bp++;
+	bits -= (8 - r_off);
+	code >>= (8 - r_off);
+
+	/* Get any 8 bit parts in the middle (<=1 for up to 16 bits). */
+	if (bits >= 8) {
+		*bp++ = code;
+		code >>= 8;
+		bits -= 8;
+	}
+	/* Last bits. */
+	if (bits)
+		*bp = code;
+	offset += n_bits;
+
+	if (offset == (n_bits << 3))
+		FLUSH_BUF(n_bits);
+	/*
+	 * If the next entry is going to be too big for the code
+	 * size, then increase it, if possible.
+	 */
+	if (free_ent > maxcode || clear_flg > 0) {
 		/*
-		 * Since code is always >= 8 bits, only need to mask the
-		 * first hunk on the left. 
+		 * Write the whole buffer, because the input side
+		 * won't discover the size increase until after it
+		 * has read it.
 		 */
-		ztmp = (code << r_off) & lmask[r_off];
-		*bp = (*bp & rmask[r_off]) | ztmp;
-		bp++;
-		bits -= (8 - r_off);
-		code >>= (8 - r_off);
-
-		/* Get any 8 bit parts in the middle (<=1 for up to 16 bits). */
-		if (bits >= 8) {
-			*bp++ = code;
-			code >>= 8;
-			bits -= 8;
-		}
-		/* Last bits. */
-		if (bits)
-			*bp = code;
-		offset += n_bits;
-
-		if (offset == (n_bits << 3)) {
-			bp = buf;
-			bits = n_bits;
-			bytes_out += bits;
-			do
-				putc_pak(*bp++, t);
-			while (--bits);
-			offset = 0;
-		}
-		/*
-		 * If the next entry is going to be too big for the code
-		 * size, then increase it, if possible. 
-		 */
-		if (free_ent > maxcode || clear_flg > 0) {
-			/*
-			 * Write the whole buffer, because the input side
-			 * won't discover the size increase until after
-			 * it has read it. 
-			 */
-			if (offset > 0) {
-				bp = buf;	/* reset pointer for writing */
-				bytes_out += n = n_bits;
-				while (n--)
-					putc_pak(*bp++, t);
-			}
-			offset = 0;
-
-			if (clear_flg) {	/* reset if clearing */
-				maxcode = MAXCODE(n_bits = INIT_BITS);
-				clear_flg = 0;
-			} else {/* else use more bits */
-				n_bits++;
-				if (n_bits == BITS)
-					maxcode = maxcodemax;
-				else
-					maxcode = MAXCODE(n_bits);
-			}
-		}
-	} else {		/* dump the buffer on EOF */
-		bytes_out += n = (offset + 7) / 8;
-
 		if (offset > 0)
-			while (n--)
-				putc_pak(*bp++, t);
-		offset = 0;
+			FLUSH_BUF(n_bits);
+
+		if (clear_flg) {	/* reset if clearing */
+			maxcode = MAXCODE(n_bits = INIT_BITS);
+			clear_flg = 0;
+		} else {/* else use more bits */
+			n_bits++;
+			if (n_bits == Bits)
+				maxcode = max_maxcode;
+			else
+				maxcode = MAXCODE(n_bits);
+		}
 	}
 }
 
 /*****************************************************************
  *
- * Read one code from the standard input.  If EOF, return -1.
+ * Read codes from the input file.  If EOF, return -1.
  * Inputs:
  *      cmpin
  * Outputs:
  *      code or -1 is returned.
  */
 
-static          int
+static int
 getcode(f)			/* get a code */
 	FILE           *f;	/* file to get from */
 {
 	int             code;
-	static int      offset = 0, size = 0;
+	static int      size = 0;
 	int             r_off, bits;
-	unsigned char  *bp = (unsigned char *) buf;
+	u_char          *bp = (u_char *) buf;
 
 	if (clear_flg > 0 || offset >= size || free_ent > maxcode) {
 		/*
 		 * If the next entry will be too big for the current code
-		 * size, then we must increase the size. This implies
-		 * reading a new buffer full, too. 
+		 * size, then we must increase the size. This implies reading
+		 * a new buffer full, too.
 		 */
 		if (free_ent > maxcode) {
 			n_bits++;
-			if (n_bits == BITS)
-				maxcode = maxcodemax;	/* won't get any bigger
+			if (n_bits == Bits)
+				maxcode = max_maxcode;	/* won't get any bigger
 							 * now */
 			else
 				maxcode = MAXCODE(n_bits);
@@ -291,10 +303,18 @@ getcode(f)			/* get a code */
 			clear_flg = 0;
 		}
 		for (size = 0; size < n_bits; size++) {
-			if ((code = getc_unp(f)) == EOF)
-				break;
-			else
-				buf[size] = (char) code;
+			if (inbeg >= inend) {
+				u_int inlen = getb_unp(f);
+				if (inlen == 0) {
+					code = EOF;
+					break;
+				} else {
+					inbeg = pinbuf;
+					inend = &inbeg[inlen];
+				}
+			}
+			code = *inbeg++;
+			buf[size] = (char) code;
 		}
 		if (size <= 0)
 			return -1;	/* end of file */
@@ -307,7 +327,7 @@ getcode(f)			/* get a code */
 	bits = n_bits;
 
 	/*
-	 * Get to the first byte. 
+	 * Get to the first byte.
 	 */
 	bp += (r_off >> 3);
 	r_off &= 7;
@@ -327,12 +347,27 @@ getcode(f)			/* get a code */
 	code |= (*bp & rmask[bits]) << r_off;
 	offset += n_bits;
 
-	return code & MAXCODE(BITS);
+	return code & MAXCODE(Bits);
+}
+
+static VOID
+inittabs()
+{
+	if (!htab) {
+		if (!(htab = (long *)malloc(SQHSIZE * sizeof(long))))
+			arcdie("Not enough memory for crunch table.");
+		if (!(codetab = (u_short *)malloc(SQHSIZE * sizeof(u_short))))
+			arcdie("Not enough memory for crunch code table.");
+		prefix = codetab;
+		suffix = (u_char *)htab;
+		stack = (u_char *) & htab[1 << SQBITS];
+		string_tab = (struct entry *) htab;
+	}
 }
 
 /*
  * compress a file
- * 
+ *
  * Algorithm:  use open addressing double hashing (no chaining) on the prefix
  * code / next character combination.  We do a variant of Knuth's algorithm D
  * (vol. 3, sec. 6.4) along with G. Knott's relatively-prime secondary probe.
@@ -344,91 +379,111 @@ getcode(f)			/* get a code */
  * decompressor.
  */
 
-void
-init_cm(t)			/* initialize for compression */
-	FILE           *t;	/* where compressed file goes */
+VOID
+init_cm(buf)			/* initialize for compression */
+	u_char          *buf;	/* input buffer */
 {
 	offset = 0;
-	bytes_out = bytes_last = 1;
-	bytes_ref = 0;
 	clear_flg = 0;
+	ratio = 0;
 	in_count = 1;
-	checkpoint = CHECK_GAP;
+	in_off = 1;
 	maxcode = MAXCODE(n_bits = INIT_BITS);
 	free_ent = FIRST;
-	setmem(htab, HSIZE * sizeof(long), 0xff);
 	n_bits = INIT_BITS;	/* set starting code size */
+	outbeg = outbuf;
+	bytes_last = 0;
+	inittabs();
 
-	putc_pak(BITS, t);	/* note our max code length */
+	if (dosquash) {
+		Bits = SQBITS;
+		Hsize = SQHSIZE;
+		Check_Gap = SQGAP;
+		bytes_out = 0;
+	} else {
+		Bits = CRBITS;
+		Hsize = CRHSIZE;
+		Check_Gap = CRGAP;
+		bytes_out = 1;
+		*outbeg++ = Bits;	/* note our max code length */
+	}
+	checkpoint = Check_Gap;
+	max_maxcode = 1 << Bits;
+	setmem(htab, Hsize * sizeof(long), 0xff);
 
-	firstcmp = 1;		/* next byte will be first */
+	ent = *buf;
+	hshift = 0;
+	for (fcode = (long) Hsize; fcode < 65536L; fcode *= 2L)
+		hshift++;
+	hshift = 8 - hshift;
 }
 
-void
-putc_cm(c, t)			/* compress a character */
-	unsigned char   c;	/* character to compress */
+VOID
+lzw_buf(buf, len, t)		/* compress a character */
+	u_char          *buf;	/* buffer to compress */
+	u_int            len;	/* length of buffer */
 	FILE           *t;	/* where to put it */
 {
-	static long     fcode;
-	static int      hshift;
-	int             i;
+	int             i, j;
 	int             disp;
 
-	if (firstcmp) {		/* special case for first byte */
-		ent = c;	/* remember first byte */
+	j = in_off;
+	buf += in_off;
+	in_off = 0;
+	for (; j < len; j++, buf++) {
+		in_count++;
 
-		hshift = 0;
-		for (fcode = (long) HSIZE; fcode < 65536L; fcode *= 2L)
-			hshift++;
-		hshift = 8 - hshift;	/* set hash code range bound */
+		fcode = (long) (((long) *buf << Bits) + ent);
+		i = (*buf << hshift) ^ ent;	/* xor hashing */
 
-		firstcmp = 0;	/* no longer first */
-		return;
-	}
-	in_count++;
-
-	fcode = (long) (((long) c << BITS) + ent);
-	i = (c << hshift) ^ ent;/* xor hashing */
-
-	if (htab[i] == fcode) {
-		ent = codetab[i];
-		return;
-	} else if (htab[i] < 0)	/* empty slot */
-		goto nomatch;
-	disp = HSIZE - i;	/* secondary hash (after G.Knott) */
-	if (i == 0)
-		disp = 1;
+		if (htab[i] == fcode) {
+			ent = codetab[i];
+			continue;
+		} else if (htab[i] < 0)	/* empty slot */
+			goto nomatch;
+		disp = Hsize - i;	/* secondary hash (after G.Knott) */
+		if (i == 0)
+			disp = 1;
 
 probe:
-	if ((i -= disp) < 0)
-		i += HSIZE;
+		if ((i -= disp) < 0)
+			i += Hsize;
 
-	if (htab[i] == fcode) {
-		ent = codetab[i];
-		return;
-	}
-	if (htab[i] > 0)
-		goto probe;
+		if (htab[i] == fcode) {
+			ent = codetab[i];
+			continue;
+		}
+		if (htab[i] > 0)
+			goto probe;
 
 nomatch:
-	putcode(ent, t);
-	ent = c;
-	if (free_ent < maxcodemax) {
-		codetab[i] = free_ent++;	/* code -> hashtable */
-		htab[i] = fcode;
+		putcode(ent, t);
+		ent = *buf;
+		if (free_ent < max_maxcode) {
+			codetab[i] = free_ent++;	/* code -> hashtable */
+			htab[i] = fcode;
+		} else if (in_count >= checkpoint)
+			cl_block(t);	/* check for adaptive reset */
 	}
-	if (in_count >= checkpoint)
-		cl_block(t);	/* check for adaptive reset */
 }
 
 long
-pred_cm(t)			/* finish compressing a file */
+pred_cm(t)			/* report compressed size */
 	FILE           *t;	/* where to put it */
 {
 	putcode(ent, t);	/* put out the final code */
-	putcode(-1, t);		/* tell output we are done */
+
+	offset = (offset + 7) / 8;
+	bytes_out += offset;
 
 	return bytes_out;	/* say how big it got */
+}
+
+VOID
+flsh_cm(t)			/* flush compressed file */
+	FILE	      *t;
+{
+	putb_pak(outbuf, (u_int) (bytes_out - bytes_last), t);
 }
 
 /*
@@ -438,35 +493,57 @@ pred_cm(t)			/* finish compressing a file */
  * compress() routine.  See the definitions above.
  */
 
-void
-decomp(f, t)			/* decompress a file */
+VOID
+decomp(squash, f, t)		/* decompress a file */
+	int		squash;	/* squashed or crunched? */
 	FILE           *f;	/* file to read codes from */
 	FILE           *t;	/* file to write text to */
 {
-	unsigned char  *stackp;
+	u_char          *stackp;
 	int             finchar;
 	int             code, oldcode, incode;
+	VOID            (*output) PROTO((u_char *buf, u_int len, FILE *f));
+	u_int		inlen;
 
-	if ((code = getc_unp(f)) != BITS)
-		abort("File packed with %d bits, I can only handle %d", code, BITS);
+	inlen = getb_unp(f);
+	inbeg = pinbuf;
+	inend = &inbeg[inlen];
+	outbeg = outbuf;
+	inittabs();
 
-	n_bits = INIT_BITS;	/* set starting code size */
+	if (squash) {
+		Bits = SQBITS;
+		output = putb_unp;
+	} else {
+		Bits = CRBITS;
+		output = putb_ncr;
+		if ((code = *inbeg++) != CRBITS)
+			arcdie("File packed with %d bits, I can only handle %d",
+			      code, CRBITS);
+	}
+
+	if (inlen<=0)
+		return;
+
+	max_maxcode = 1 << Bits;
 	clear_flg = 0;
 
+	n_bits = INIT_BITS;	/* set starting code size */
+
 	/*
-	 * As above, initialize the first 256 entries in the table. 
+	 * As above, initialize the first 256 entries in the table.
 	 */
-	maxcode = MAXCODE(n_bits = INIT_BITS);
+	maxcode = MAXCODE(n_bits);
 	setmem(prefix, 256 * sizeof(short), 0);	/* reset decode string table */
 	for (code = 255; code >= 0; code--)
-		suffix[code] = (unsigned char) code;
+		suffix[code] = (u_char) code;
 
 	free_ent = FIRST;
 
 	finchar = oldcode = getcode(f);
 	if (oldcode == -1)	/* EOF already? */
 		return;		/* Get out of here */
-	putc_ncr((unsigned char) finchar, t);	/* first code must be 8 bits=char */
+	*outbeg++ = finchar;	/* first code must be 8 bits=char */
 	stackp = stack;
 
 	while ((code = getcode(f)) > -1) {
@@ -479,23 +556,23 @@ decomp(f, t)			/* decompress a file */
 		}
 		incode = code;
 		/*
-		 * Special case for KwKwK string. 
+		 * Special case for KwKwK string.
 		 */
 		if (code >= free_ent) {
 			if (code > free_ent) {
 				if (warn) {
 					printf("Corrupted compressed file.\n");
 					printf("Invalid code %d when max is %d.\n",
-						code, free_ent);
+					       code, free_ent);
 				}
 				nerrs++;
-				return;
+				break;
 			}
 			*stackp++ = finchar;
 			code = oldcode;
 		}
 		/*
-		 * Generate output characters in reverse order 
+		 * Generate output characters in reverse order
 		 */
 		while (code >= 256) {
 			*stackp++ = suffix[code];
@@ -504,25 +581,32 @@ decomp(f, t)			/* decompress a file */
 		*stackp++ = finchar = suffix[code];
 
 		/*
-		 * And put them out in forward order 
+		 * And put them out in forward order
 		 */
-		do
-			putc_ncr(*--stackp, t);
-		while (stackp > stack);
+		do {
+			*outbeg++ = *--stackp;
+			if (outbeg >= outend) {
+				(*output) (outbuf, outbeg-outbuf, t);
+				outbeg = outbuf;
+			}
+		} while (stackp > stack);
 
 		/*
-		 * Generate the new entry. 
+		 * Generate the new entry.
 		 */
-		if ((code = free_ent) < maxcodemax) {
-			prefix[code] = (unsigned short) oldcode;
+		if ((code = free_ent) < max_maxcode) {
+			prefix[code] = (u_short) oldcode;
 			suffix[code] = finchar;
 			free_ent = code + 1;
 		}
 		/*
-		 * Remember previous code. 
+		 * Remember previous code.
 		 */
 		oldcode = incode;
 	}
+
+	if (outbeg > outbuf)
+		(*output) (outbuf, outbeg-outbuf, t);
 }
 
 
@@ -536,36 +620,36 @@ decomp(f, t)			/* decompress a file */
 /*
  * The h() pointer points to the routine to use for calculating a hash value.
  * It is set in the init routines to point to either of oldh() or newh().
- * 
+ *
  * oldh() calculates a hash value by taking the middle twelve bits of the square
  * of the key.
- * 
+ *
  * newh() works somewhat differently, and was tried because it makes ARC about
  * 23% faster.  This approach was abandoned because dynamic Lempel-Zev
  * (above) works as well, and packs smaller also.  However, inadvertent
  * release of a developmental copy forces us to leave this in.
  */
 
-static unsigned short(*h) ();	/* pointer to hash function */
+static          u_short(*h) ();	/* pointer to hash function */
 
-static unsigned short
+static          u_short
 oldh(pred, foll)		/* old hash function */
-	unsigned short  pred;	/* code for preceeding string */
-	unsigned char   foll;	/* value of following char */
+	u_short          pred;	/* code for preceeding string */
+	u_char           foll;	/* value of following char */
 {
 	long            local;	/* local hash value */
 
-	local = ((pred + foll) | 0x0800) & 0xFFFF; /* create the hash key */
+	local = ((pred + foll) | 0x0800) & 0xFFFF;	/* create the hash key */
 	local *= local;		/* square it */
 	return (local >> 6) & 0x0FFF;	/* return the middle 12 bits */
 }
 
-static unsigned short
+static          u_short
 newh(pred, foll)		/* new hash function */
-	unsigned short  pred;	/* code for preceeding string */
-	unsigned char   foll;	/* value of following char */
+	u_short          pred;	/* code for preceeding string */
+	u_char           foll;	/* value of following char */
 {
-	return (((pred + foll) & 0xFFFF) * 15073) & 0xFFF; /* faster hash */
+	return (((pred + foll) & 0xFFFF) * 15073) & 0xFFF;	/* faster hash */
 }
 
 /*
@@ -573,9 +657,9 @@ newh(pred, foll)		/* new hash function */
  * duplicate keys until the last duplicate is found.
  */
 
-static unsigned short
+static          u_short
 eolist(index)			/* find last duplicate */
-	unsigned short  index;
+	u_short          index;
 {
 	int             temp;
 
@@ -593,12 +677,12 @@ eolist(index)			/* find last duplicate */
  * checked for elsewhere.
  */
 
-static unsigned short
+static          u_short
 hash(pred, foll)		/* find spot in the string table */
-	unsigned short  pred;	/* code for preceeding string */
-	unsigned char   foll;	/* char following string */
+	u_short          pred;	/* code for preceeding string */
+	u_char           foll;	/* char following string */
 {
-	unsigned short  local, tempnext;	/* scratch storage */
+	u_short          local, tempnext;	/* scratch storage */
 	struct entry   *ep;	/* allows faster table handling */
 
 	local = (*h) (pred, foll);	/* get initial hash value */
@@ -611,7 +695,7 @@ hash(pred, foll)		/* find spot in the string table */
 
 		/*
 		 * We must find an empty spot. We start looking 101 places
-		 * down the table from the last duplicate. 
+		 * down the table from the last duplicate.
 		 */
 
 		tempnext = (local + 101) & 0x0FFF;
@@ -628,7 +712,7 @@ hash(pred, foll)		/* find spot in the string table */
 		/*
 		 * local still has the pointer to the last duplicate, while
 		 * tempnext has the pointer to the spot we found.  We use
-		 * this to maintain the chain of pointers to duplicates. 
+		 * this to maintain the chain of pointers to duplicates.
 		 */
 
 		string_tab[local].next = tempnext;
@@ -642,17 +726,15 @@ hash(pred, foll)		/* find spot in the string table */
  * of course, that "initialize" is a complete misnomer.
  */
 
-static          void
+static VOID
 init_tab()
 {				/* set ground state in hash table */
 	unsigned int    i;	/* table index */
 
-	setmem((char *) string_tab, sizeof(string_tab), 0);
+	setmem((char *) string_tab, TABSIZE * sizeof(struct entry), 0);
 
 	for (i = 0; i < 256; i++)	/* list all single byte strings */
 		upd_tab(NO_PRED, i);
-
-	inbuf = EMPTY;		/* nothing is in our buffer */
 }
 
 /*
@@ -661,10 +743,10 @@ init_tab()
  * room.  This must be done elsewhere.
  */
 
-void
+VOID
 upd_tab(pred, foll)		/* add an entry to the table */
-	unsigned short  pred;	/* code for preceeding string */
-	unsigned short  foll;	/* character which follows string */
+	u_short          pred;	/* code for preceeding string */
+	u_short          foll;	/* character which follows string */
 {
 	struct entry   *ep;	/* pointer to current entry */
 
@@ -683,113 +765,87 @@ upd_tab(pred, foll)		/* add an entry to the table */
  * gocode() routine is used to read these strings a byte (or two) at a time.
  */
 
-static          int
-gocode(fd)			/* read in a twelve bit code */
-	FILE           *fd;	/* file to get code from */
-{
-	unsigned short  localbuf, returnval;
-	int             temp;
+#define	GOCODE(x)\
+if ((inflag^=1)) { x = (*inbeg++ << 4); x |= (*inbeg >> 4); } \
+else {x = (*inbeg++ & 0x0f) << 8; x |= (*inbeg++); }
 
-	if (inbuf == EMPTY) {	/* if on a code boundary */
-		if ((temp = getc_unp(fd)) == EOF)	/* get start of next
-							 * code */
-			return EOF;	/* pass back end of file status */
-		localbuf = temp & 0xFF;	/* mask down to true byte value */
-		if ((temp = getc_unp(fd)) == EOF)
-			/* get end of code, * start of next */
-			return EOF;	/* this should never happen */
-		inbuf = temp & 0xFF;	/* mask down to true byte value */
+/* push char onto stack */
+#define	PUSH(c)	\
+do {	stack[sp] = ((char) (c)); \
+	if (++sp >= TABSIZE) \
+		arcdie("Stack overflow\n"); \
+} while (0)
 
-		returnval = ((localbuf << 4) & 0xFF0) + ((inbuf >> 4) & 0x00F);
-		inbuf &= 0x000F;/* leave partial code pending */
-	} else {		/* buffer contains first nybble */
-		if ((temp = getc_unp(fd)) == EOF)
-			return EOF;
-		localbuf = temp & 0xFF;
-
-		returnval = localbuf + ((inbuf << 8) & 0xF00);
-		inbuf = EMPTY;	/* note no hanging nybbles */
-	}
-	return returnval;	/* pass back assembled code */
-}
-
-static          void
-push(c)				/* push char onto stack */
-	int             c;	/* character to push */
-{
-	stack[sp] = ((char) c);	/* coerce integer into a char */
-
-	if (++sp >= TABSIZE)
-		abort("Stack overflow\n");
-}
-
-static          int
-pop()
-{				/* pop character from stack */
-	if (sp > 0)
-		return ((int) stack[--sp]);	/* leave ptr at next empty
-						 * slot */
-
-	else
-		return EMPTY;
-}
+/* pop character from stack */
+#define POP()	((sp > 0) ? (int) stack[--sp] : EMPTY)
 
 /***** LEMPEL-ZEV DECOMPRESSION *****/
 
 static int      code_count;	/* needed to detect table full */
-static int      firstc;		/* true only on first character */
+static int      oldcode, finchar;
 
-void
-init_ucr(new)			/* get set for uncrunching */
+VOID
+init_ucr(new, f)		/* get set for uncrunching */
 	int             new;	/* true to use new hash function */
+	FILE	       *f;	/* input file */
 {
 	if (new)		/* set proper hash function */
 		h = newh;
 	else
 		h = oldh;
 
+	inittabs();		/* allocate table space */
 	sp = 0;			/* clear out the stack */
 	init_tab();		/* set up atomic code definitions */
 	code_count = TABSIZE - 256;	/* note space left in table */
-	firstc = 1;		/* true only on first code */
+	inbeg = pinbuf;
+	inend = &inbeg[getb_unp(f)];
+	inflag = 0;
+	GOCODE(oldcode);
+	finchar = string_tab[oldcode].follower;
+	outbeg = outbuf;
+	*outbeg++ = finchar;
 }
 
-int
-getc_ucr(f)			/* get next uncrunched byte */
+u_int
+getb_ucr(f)			/* get next uncrunched byte */
 	FILE           *f;	/* file containing crunched data */
 {
 	int             code, newcode;
-	static int      oldcode, finchar;
 	struct entry   *ep;	/* allows faster table handling */
+	u_int		len;
 
-	if (firstc) {		/* first code is always known */
-		firstc = FALSE;	/* but next will not be first */
-		oldcode = gocode(f);
-		return finchar = string_tab[oldcode].follower;
-	}
+	do {
 	if (!sp) {		/* if stack is empty */
-		if ((code = newcode = gocode(f)) == EOF)
-			return EOF;
+		if (inbeg >= inend-1) {
+			inbeg = pinbuf;
+			inend = &inbeg[getb_unp(f)];
+			if (inbeg == inend) {
+				break;
+			}
+		}
+		GOCODE(newcode);
+		code = newcode;
 
 		ep = &string_tab[code];	/* initialize pointer */
 
 		if (!ep->used) {/* if code isn't known */
 			code = oldcode;
 			ep = &string_tab[code];	/* re-initialize pointer */
-			push(finchar);
+			PUSH(finchar);
 		}
 		while (ep->predecessor != NO_PRED) {
-			push(ep->follower);	/* decode string backwards */
+			PUSH(ep->follower);	/* decode string backwards */
 			code = ep->predecessor;
 			ep = &string_tab[code];
 		}
 
-		push(finchar = ep->follower);	/* save first character also */
+		PUSH(finchar = ep->follower);	/* save first character also */
 
 		/*
 		 * The above loop will terminate, one way or another, with
 		 * string_tab[code].follower equal to the first character in
-		 * the string. 
+		 * the string.
 		 */
 
 		if (code_count) {	/* if room left in string table */
@@ -798,5 +854,9 @@ getc_ucr(f)			/* get next uncrunched byte */
 		}
 		oldcode = newcode;
 	}
-	return pop();		/* return saved character */
+	*outbeg++ = POP();
+	} while (outbeg <= outend);
+	len = outbeg - outbuf;
+	outbeg = outbuf;
+	return (len);
 }

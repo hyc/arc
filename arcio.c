@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcio.c,v 1.1 1988/06/13 18:48:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcio.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCIO
@@ -19,12 +19,12 @@
 */
 #include <stdio.h>
 #include "arc.h"
-#if	MTS
-#include <ctype.h>
+#if	_MTS
+#include <mts.h>
 #endif
+#include <string.h>
 
-void	abort();
-int	strlen(), free();
+VOID	arcdie();
 
 int
 readhdr(hdr, f)			/* read a header from an archive */
@@ -41,14 +41,16 @@ readhdr(hdr, f)			/* read a header from an archive */
 
 	if (!f)			/* if archive didn't open */
 		return 0;	/* then pretend it's the end */
+	hdrver = fgetc(f);
 	if (feof(f))		/* if no more data */
 		return 0;	/* then signal end of archive */
 
-	if (fgetc(f) != ARCMARK) {	/* check archive validity */
+	if (hdrver != ARCMARK) {	/* check archive validity */
 		if (warn) {
-			printf("An entry in %s has a bad header.", arcname);
+			printf("An entry in %s has a bad header.\n", arcname);
 			nerrs++;
 		}
+		printf("hdrver: %x\n", hdrver);
 		while (!feof(f)) {
 			try++;
 			if (fgetc(f) == ARCMARK) {
@@ -59,10 +61,10 @@ readhdr(hdr, f)			/* read a header from an archive */
 		}
 
 		if (feof(f) && first)
-			abort("%s is not an archive", arcname);
+			arcdie("%s is not an archive", arcname);
 
 		if (changing && warn)
-			abort("%s is corrupted -- changes disallowed", arcname);
+			arcdie("%s is corrupted -- changes disallowed", arcname);
 
 		if (warn)
 			printf("  %d bytes skipped.\n", try);
@@ -72,12 +74,12 @@ readhdr(hdr, f)			/* read a header from an archive */
 	}
 	hdrver = fgetc(f);	/* get header version */
 	if (hdrver & 0x80)	/* sign bit? negative? */
-		abort("Invalid header in archive %s", arcname);
+		arcdie("Invalid header in archive %s", arcname);
 	if (hdrver == 0)
 		return 0;	/* note our end of archive marker */
 	if (hdrver > ARCVER) {
 		fread(name, sizeof(char), FNLEN, f);
-#if	MTS
+#if	_MTS
 		atoe(name, strlen(name));
 #endif
 		printf("I don't know how to handle file %s in archive %s\n",
@@ -99,14 +101,14 @@ readhdr(hdr, f)			/* read a header from an archive */
 		fread(dummy, 27, 1, f);
 
 	for (i = 0; i < FNLEN; hdr->name[i] = dummy[i], i++);
-#if	MTS
+#if	_MTS
 	(void) atoe(hdr->name, strlen(hdr->name));
 #endif
-	for (i = 0; i<4; hdr->size<<=8, hdr->size += dummy[16-i], i++);
+	for (i = 0, hdr->size=0; i<4; hdr->size<<=8, hdr->size += dummy[16-i], i++);
 	hdr->date = (short) ((dummy[18] << 8) + dummy[17]);
 	hdr->time = (short) ((dummy[20] << 8) + dummy[19]);
 	hdr->crc = (short) ((dummy[22] << 8) + dummy[21]);
-	for (i = 0; i<4; hdr->length<<=8, hdr->length += dummy[26-i], i++);
+	for (i = 0, hdr->length=0; i<4; hdr->length<<=8, hdr->length += dummy[26-i], i++);
 #endif
 
 	if (hdr->date > olddate
@@ -118,7 +120,7 @@ readhdr(hdr, f)			/* read a header from an archive */
 	return 1;		/* we read something */
 }
 
-void
+VOID
 put_int(number, f)		/* write a 2 byte integer */
 	short           number;
 	FILE           *f;
@@ -127,7 +129,7 @@ put_int(number, f)		/* write a 2 byte integer */
 	fputc((char) (number >> 8), f);
 }
 
-void
+VOID
 put_long(number, f)		/* write a 4 byte integer */
 	long            number;
 	FILE           *f;
@@ -136,7 +138,7 @@ put_long(number, f)		/* write a 4 byte integer */
 	put_int((short) (number >> 16), f);
 }
 
-void
+VOID
 writehdr(hdr, f)		/* write a header to an archive */
 	struct heads   *hdr;	/* header to write */
 	FILE           *f;	/* archive to write to */
@@ -149,7 +151,7 @@ writehdr(hdr, f)		/* write a header to an archive */
 	fwrite(hdr, sizeof(struct heads), 1, f);
 #else
 	/* byte/word ordering hassles... */
-#if	MTS
+#if	_MTS
 	etoa(hdr->name, strlen(hdr->name));
 #endif
 	fwrite(hdr->name, 1, FNLEN, f);
@@ -169,20 +171,7 @@ writehdr(hdr, f)		/* write a header to an archive */
 	}
 }
 
-void
-putc_tst(c, t)			/* put a character, with tests */
-	char            c;	/* character to output */
-	FILE           *t;	/* file to write to */
-{
-	c &= 0xff;
-	if (t)
-#if	UNIX
-		fputc(c, t);
-#else
-		if (fputc(c, t) == EOF)
-			abort("Write fail (disk full?)");
-#endif
-}
+extern char	*pinbuf;	/* general purpose input buffer */
 
 /*
  * NOTE:  The filecopy() function is used to move large numbers of bytes from
@@ -210,22 +199,13 @@ filecopy(f, t, size)		/* bulk file copier */
 	FILE           *f, *t;	/* files from and to */
 	long            size;	/* bytes to copy */
 {
-	char           *buf;	/* buffer pointer */
-	char           *alloc();/* buffer allocator */
 	unsigned int    bufl;	/* buffer length */
 	unsigned int    coreleft();	/* space available reporter */
 	unsigned int    cpy;	/* bytes being copied */
 	long            floc, tloc, fseek();	/* file pointers, setter */
 	struct regval   reg;	/* registers for DOS calls */
 
-	if ((bufl = coreleft()) < 1000)	/* see how much space we have */
-		abort("Out of memory");
-	bufl -= 1000;		/* fudge factor for overhead */
-	if (bufl > 60000)
-		bufl = 60000;	/* avoid choking alloc() */
-	if (bufl > size)
-		bufl = size;	/* avoid wasting space */
-	buf = alloc(bufl);	/* allocate our buffer */
+	bufl = (MYBUF > size) ? (u_int) size : MYBUF;
 
 	floc = fseek(f, 0L, 1);	/* reset I/O system */
 	tloc = fseek(t, 0L, 1);
@@ -236,51 +216,45 @@ filecopy(f, t, size)		/* bulk file copier */
 		reg.ax = 0x3F00;/* read from handle */
 		reg.bx = filehand(f);
 		reg.cx = bufl < size ? bufl : size;	/* amount to read */
-		reg.dx = buf;
+		reg.dx = pinbuf;
 		if (sysint21(&reg, &reg) & 1)
-			abort("Read fail");
+			arcdie("Read fail");
 
 		cpy = reg.ax;	/* amount actually read */
 		reg.ax = 0x4000;/* write to handle */
 		reg.bx = filehand(t);
 		reg.cx = cpy;
-		reg.dx = buf;
+		reg.dx = pinbuf;
 		sysint21(&reg, &reg);
 
 		if (reg.ax != cpy)
-			abort("Write fail (disk full?)");
+			arcdie("Write fail (disk full?)");
 
 		size -= (long) cpy;
 	}
-
-	free(buf);		/* all done with buffer */
 }
 #else
 
-void
+VOID
 filecopy(f, t, size)		/* bulk file copier */
 	FILE           *f, *t;	/* files from and to */
 	long            size;	/* bytes to copy */
 {
-	char           *buf;	/* buffer pointer */
-	char           *malloc();	/* buffer allocator */
 	unsigned int    bufl;	/* buffer length */
 	unsigned int    cpy;	/* bytes being copied */
 
-	bufl = 32760;
-	if (bufl > size)
-		bufl = size;	/* don't waste space */
-
-	buf = malloc(bufl);
+	bufl = (MYBUF > size) ? (u_int) size : MYBUF;
 
 	while (size > 0) {
-		cpy = fread(buf, sizeof(char),
-			bufl < size ? bufl : (unsigned short) size, f);
-		if (fwrite(buf, sizeof(char), cpy, t) != cpy)
-			abort("Write fail (no space?)");
+		cpy = fread(pinbuf, sizeof(char), bufl, f);
+		if (fwrite(pinbuf, sizeof(char), cpy, t) != cpy)
+			arcdie("Write fail (no space?)");
 		size -= cpy;
+		if (bufl > size)
+			bufl = size;
+		if (ferror(f))
+			arcdie("Unexpected EOF copying archive");
+		if (!cpy) break;
 	}
-
-	free(buf);
 }
 #endif

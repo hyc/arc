@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcdos.c,v 1.1 1988/06/13 19:08:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcdos.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -30,26 +30,29 @@
 #if	UNIX
 #include <sys/types.h>
 #include <sys/stat.h>
+#if	BSD
 #include <sys/time.h>
-#include "tws.h"
-#endif
-
-#if	SYSV
-struct timeval {
-	long tv_sec;
-	long tv_usec;
+#else	
+#include <time.h>		/* Sys V. Bleah. */
+struct	timeval {
+	long	tv_sec;
+	long	tv_usec;
 };
+#endif	/* BSD vs SYSV */
 #endif
 
 #if	GEMDOS
 #include <osbind.h>
 #endif
 
-char	*strcpy(), *strcat(), *malloc();
+#include <string.h>
+#ifndef	__STDC__
+char	*malloc();
+#endif
 
-void
+VOID
 getstamp(f, date, time)		/* get a file's date/time stamp */
-#if	!MTS
+#if	!_MTS
 	FILE           *f;	/* file to get stamp from */
 #else
 	char           *f;	/* filename "" "" */
@@ -78,25 +81,17 @@ getstamp(f, date, time)		/* get a file's date/time stamp */
 	*time = ret[0];
 #endif
 #if	UNIX
-	char	       *ctime();
-	struct stat    *buf;
-	int             day, hr, min, sec, yr, imon;
-	static char     mon[4], *mons[12] = {
-				   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-				    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-	};
+	struct stat	buf;
+	struct tm	*localtime(), *t;
 
-	buf = (struct stat *) malloc(sizeof(struct stat));
-	fstat(fileno(f), buf);
-
-	sscanf(ctime(&(buf->st_mtime)), "%*4s%3s%d%d:%d:%d%d", mon, &day, &hr, &min,
-	       &sec, &yr);
-	for (imon = 0; imon < 12 && strcmp(mon, mons[imon]); imon++);
-
-	*date = (unsigned short) (((yr - 1980) << 9) + ((imon + 1) << 5) + day);
-	*time = (unsigned short) ((hr << 11) + (min << 5) + sec / 2);
+	fstat(fileno(f), &buf);
+	t=localtime(&(buf.st_mtime));
+	*date = (unsigned short) (((t->tm_year - 80) << 9) +
+				((t->tm_mon + 1) << 5) + t->tm_mday);
+	*time = (unsigned short) ((t->tm_hour << 11) +
+				(t->tm_min << 5) + t->tm_sec / 2);
 #endif
-#if	MTS
+#if	_MTS
 	fortran         timein(),
 #if	USEGFINFO
 	                gfinfo();
@@ -144,7 +139,7 @@ getstamp(f, date, time)		/* get a file's date/time stamp */
 #endif
 }
 
-void
+VOID
 setstamp(f, date, time)		/* set a file's date/time stamp */
 	char           *f;	/* filename to stamp */
 	unsigned short    date, time;	/* desired date, time */
@@ -175,19 +170,17 @@ setstamp(f, date, time)		/* set a file's date/time stamp */
 	Fclose(fd);
 #endif
 #if	UNIX
-	struct tws      tms;
+	struct tm	tm;
 	struct timeval  tvp[2];
 	int	utimes();
-	twscopy(&tms, dtwstime());
-	tms.tw_sec = (time & 31) * 2;
-	tms.tw_min = (time >> 5) & 63;
-	tms.tw_hour = (time >> 11);
-	tms.tw_mday = date & 31;
-	tms.tw_mon = ((date >> 5) & 15) - 1;
-	tms.tw_year = (date >> 9) + 80;
-	tms.tw_clock = 0L;
-	tms.tw_flags = TW_NULL;
-	tvp[0].tv_sec = twclock(&tms);
+	long	tmclock();
+	tm.tm_sec = (time & 31) * 2;
+	tm.tm_min = (time >> 5) & 63;
+	tm.tm_hour = (time >> 11);
+	tm.tm_mday = date & 31;
+	tm.tm_mon = ((date >> 5) & 15) - 1;
+	tm.tm_year = (date >> 9) + 80;
+	tvp[0].tv_sec = tmclock(&tm);
 	tvp[1].tv_sec = tvp[0].tv_sec;
 	tvp[0].tv_usec = tvp[1].tv_usec = 0;
 	utimes(f, tvp);

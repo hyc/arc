@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcusq.c,v 1.1 1988/06/02 21:28:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcusq.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -9,7 +9,7 @@
  * 
  * (C) COPYRIGHT 1985 by System Enhancement Associates; ALL RIGHTS RESERVED
  * 
- * By:  Thom Henderson
+ * By:	Thom Henderson
  * 
  * Description: This file contains the routines used to expand a file which was
  * packed using Huffman squeezing.
@@ -22,8 +22,9 @@
 #include <stdio.h>
 #include "arc.h"
 
-void	abort();
-int	getc_unp();
+#include "proto.h"
+
+VOID		arcdie();
 
 /* stuff for Huffman unsqueezing */
 
@@ -32,36 +33,41 @@ int	getc_unp();
 #define SPEOF 256		/* special endfile token */
 #define NUMVALS 257		/* 256 data values plus SPEOF */
 
-extern	struct nd {		/* decoding tree */
-	int	child[2];	/* left, right */
-}               node[NUMVALS];	/* use large buffer */
+extern struct nd {		/* decoding tree */
+	int		child[2];	/* left, right */
+}		node[NUMVALS];	/* use large buffer */
 
-static int      bpos;		/* last bit position read */
-static int      curin;		/* last byte value read */
-static int      numnodes;	/* number of nodes in decode tree */
+extern char	*pinbuf;
+extern u_char	*outbuf, *outbeg, *outend;
 
-static          short
-get_int(f)			/* get a 16bit integer */
-	FILE           *f;	/* file to get it from */
-{
-	int	i,j;
-	i = getc_unp(f);
-	j = getc_unp(f) << 8;
-	return (i | j) & 0xFFFF;
-}
+static int	bpos;		/* last bit position read */
+extern int	curin;		/* last byte value read */
+static int	numnodes;	/* number of nodes in decode tree */
 
-void
+extern char  *inbeg, *inend;
+
+/* get a 16bit integer */
+#define GET_INT(x)	\
+{	x = (u_char) (*inbeg++); \
+	x |= *inbeg++ << 8;}
+
+VOID
 init_usq(f)			/* initialize Huffman unsqueezing */
-	FILE           *f;	/* file containing squeezed data */
+	FILE	       *f;	/* file containing squeezed data */
 {
-	int             i;	/* node index */
+	int		i;	/* node index */
+	u_int		inlen;
 
 	bpos = 99;		/* force initial read */
 
-	numnodes = get_int(f);
+	inlen = getb_unp(f);
+	inbeg = pinbuf;
+	inend = &pinbuf[inlen];
+
+	GET_INT(numnodes);
 
 	if (numnodes < 0 || numnodes >= NUMVALS)
-		abort("File has an invalid decode tree");
+		arcdie("File has an invalid decode tree");
 
 	/* initialize for possible empty tree (SPEOF only) */
 
@@ -70,37 +76,51 @@ init_usq(f)			/* initialize Huffman unsqueezing */
 
 	for (i = 0; i < numnodes; ++i) {	/* get decoding tree from
 						 * file */
-		node[i].child[0] = get_int(f);
-		node[i].child[1] = get_int(f);
+		GET_INT(node[i].child[0]);
+		GET_INT(node[i].child[1]);
 	}
 }
 
-int
-getc_usq(f)			/* get byte from squeezed file */
-	FILE           *f;	/* file containing squeezed data */
+u_int
+getb_usq(f)			/* get byte from squeezed file */
+	FILE	       *f;	/* file containing squeezed data */
 {
-	int             i;	/* tree index */
+	int		i;	/* tree index */
+	u_int		j;
 
-	/* follow bit stream in tree to a leaf */
+	outbeg = outbuf;
+	for (j = 0; j < MYBUF; j++) {
+		/* follow bit stream in tree to a leaf */
 
-	for (i = 0; i >= 0;) {	/* work down(up?) from root */
-		if (++bpos > 7) {
-			if ((curin = getc_unp(f)) == ERROR)
-				return (ERROR);
-			bpos = 0;
+		for (i = 0; i >= 0;) {	/* work down(up?) from root */
+			if (++bpos > 7) {
+				if (inbeg >= inend) {
+					inend = &pinbuf[getb_unp(f)];
+					inbeg = pinbuf;
+					if (inend == inbeg) {
+						if (!curin)
+							j--;
+						return(j);
+					}
+				}
+				curin = *inbeg++;
+				bpos = 0;
 
-			/* move a level deeper in tree */
-			i = node[i].child[1 & curin];
-		} else
-			i = node[i].child[1 & (curin >>= 1)];
+				/* move a level deeper in tree */
+				i = node[i].child[1 & curin];
+			} else
+				i = node[i].child[1 & (curin >>= 1)];
+		}
+
+		/* decode fake node index to original data value */
+
+		i = -(i + 1);
+
+		if (i != SPEOF)
+			*outbeg++ = i;
+		else
+			break;
 	}
-
-	/* decode fake node index to original data value */
-
-	i = -(i + 1);
-
-	/* decode special endfile token to normal EOF */
-
-	i = (i == SPEOF) ? EOF : i;
-	return i;
+	/*NOTREACHED*/
+	return (j);
 }

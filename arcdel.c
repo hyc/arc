@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcdel.c,v 1.1 1988/04/19 06:39:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcdel.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include "arc.h"
 
-void	abort(), rempath(), openarc(), closearc(), writehdr(), filecopy();
+VOID	arcdie(), rempath(), openarc(), closearc(), writehdr(), filecopy();
 int	match(), readhdr();
 
-void
+VOID
 delarc(num, arg)		/* remove files from archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -33,7 +33,7 @@ delarc(num, arg)		/* remove files from archive */
 	int             n;	/* index */
 
 	if (!num)		/* she must specify which */
-		abort("You must tell me which files to delete!");
+		arcdie("You must tell me which files to delete!");
 
 	for (n = 0; n < num; n++)	/* for each argument */
 		did[n] = 0;	/* reset usage flag */

@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcadd.c,v 1.1 1988/06/13 05:31:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcadd.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -17,20 +17,31 @@
  */
 #include <stdio.h>
 #include "arc.h"
-#if	MTS
+#if	_MTS
 #include <mts.h>
+#include <ctype.h>
+#endif
+#include <string.h>
+#if	BSD
+#include <strings.h>
 #endif
 
-static	void	addfile();
-char	*strcpy();
-int	strcmp(), strlen(), free(), readhdr(), unlink();
+static	int	addfile();
+int	readhdr(), unlink();
 #if	UNIX
 int	izadir();
 #endif
-void	writehdr(), filecopy(), getstamp();
-void	pack(), closearc(), openarc(), abort();
+VOID	writehdr(), filecopy(), getstamp();
+VOID	pack(), closearc(), openarc(), arcdie();
 
-void
+#ifndef	__STDC__
+char           *malloc(), *realloc();	/* memory allocators */
+#ifndef _AIX
+VOID	free();
+#endif
+#endif
+
+VOID
 addarc(num, arg, move, update, fresh)		/* add files to archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -45,8 +56,7 @@ int             fresh;		/* true if freshening */
 	int             nfiles = 0;	/* number of files in lists */
 	int             notemp;	/* true until a template works */
 	int             nowork = 1;	/* true until files are added */
-	char           *i, *rindex();	/* string indexing junk */
-	char           *malloc(), *realloc();	/* memory allocators */
+	char           *i;	/* string indexing junk */
 	int             n;	/* index */
 #if	MSDOS
 	unsigned int	coreleft();	/* remaining memory reporter */
@@ -61,7 +71,7 @@ int             fresh;		/* true if freshening */
 #if	UNIX
 		arg[0] = "*";
 #endif
-#if	MTS
+#if	_MTS
 		arg[0] = "?";
 #endif
 	}
@@ -71,7 +81,7 @@ int             fresh;		/* true if freshening */
 
 	for (n = 0; n < num; n++) {	/* for each template supplied */
 		strcpy(buf, arg[n]);	/* get ready to fix path */
-#if	!MTS
+#if	!_MTS
 		if (!(i = rindex(buf, '\\')))
 			if (!(i = rindex(buf, '/')))
 				if (!(i = rindex(buf, ':')))
@@ -188,12 +198,21 @@ addbunch(nfiles, path, name, move, update, fresh)	/* add a bunch of files */
 	for (n = 0; n < nfiles - 1; n++) {	/* watch out for duplicate
 						 * names */
 		if (!strcmp(name[n], name[n + 1]))
-			abort("Duplicate filenames:\n  %s\n  %s", path[n], path[n + 1]);
+			arcdie("Duplicate filenames:\n  %s\n  %s", path[n], path[n + 1]);
 	}
 	openarc(1);		/* open archive for changes */
 
-	for (n = 0; n < nfiles; n++)	/* add each file in the list */
-		addfile(path[n], name[n], update, fresh);
+	for (n = 0; n < nfiles;) { /* add each file in the list */
+		if (addfile(path[n], name[n], update, fresh) < 0) {
+			free(path[n]);		/* remove this name if */
+			free(name[n]);		/* it wasn't added */
+			for (m = n; m < nfiles-1 ; m++) {
+				path[m] = path[m+1];
+				name[m] = name[m+1];
+			}
+			nfiles--;
+		} else n++;
+	}
 
 	/* now we must copy over all files that follow our additions */
 
@@ -217,7 +236,7 @@ addbunch(nfiles, path, name, move, update, fresh)	/* add a bunch of files */
 	return nfiles;		/* say how many were added */
 }
 
-static          void
+static          int
 addfile(path, name, update, fresh)	/* add named file to archive */
 	char           *path;	/* path name of file to add */
 	char           *name;	/* name of file to add */
@@ -230,11 +249,11 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 	long            starts, ftell();	/* file locations */
 	int             upd = 0;/* true if replacing an entry */
 
-#if	!MTS
-	if (!(f = fopen(path, "rb")))
+#if	!_MTS
+	if (!(f = fopen(path, OPEN_R)))
 #else
 	if (image)
-		f = fopen(path, "rb");
+		f = fopen(path, OPEN_R);
 	else
 		f = fopen(path, "r");
 	if (!f)
@@ -244,26 +263,53 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 			printf("Cannot read file: %s\n", path);
 			nerrs++;
 		}
-		return;
+		return(-1);
 	}
+#if	!DOS
+	if (strlen(name) >= FNLEN) {
+		if (warn) {
+			char	buf[STRLEN];
+			printf("WARNING: File %s name too long!\n", name);
+			name[FNLEN-1]='\0';
+			while(1) {
+				printf("  Truncate to %s (y/n)? ", name);
+				fflush(stdout);
+				fgets(buf, STRLEN, stdin);
+				*buf = toupper(*buf);
+				if (*buf == 'Y' || *buf == 'N')
+					break;
+			}
+			if (*buf == 'N') {
+				printf("Skipping...\n");
+				fclose(f);
+				return(-1);
+			}
+		}
+		else {
+			if (note)
+				printf("Skipping file: %s - name too long.\n",
+					name);
+			fclose(f);
+			return(-1);
+		}
+	}
+#endif
 	strcpy(nhdr.name, name);/* save name */
 	nhdr.size = 0;		/* clear out size storage */
 	nhdr.crc = 0;		/* clear out CRC check storage */
-#if	!MTS
+#if	!_MTS
 	getstamp(f, &nhdr.date, &nhdr.time);
 #else
 	{
-	char *buffer, *malloc();
 	int	inlen;
 	struct	GDDSECT	*region;
 
-	region=gdinfo(f->_fd);
+	region=gdinfo(f->_fd._fdub);
 	inlen=region->GDINLEN;
-	buffer=malloc(inlen);   /* maximum line length */
-	setbuf(f,buffer);        
-	f->_bufsiz=inlen;        
-	f->_mods|=0x00040000;   /* Don't do "$continue with" */
-	f->_mods&=0xfff7ffff;   /* turn it off, if set... */
+	buf=malloc(inlen);	/* maximum line length */
+	setbuffer(f,buf,inlen);
+	f->_mods|=_NOIC;	/* Don't do "$continue with" */
+	f->_mods&=~_IC;		/* turn it off, if set... */
 	}
 	getstamp(path, &nhdr.date, &nhdr.time);
 #endif
@@ -281,7 +327,7 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 					    || (nhdr.date == ohdr.date && nhdr.time <= ohdr.time)) {
 						fseek(arc, starts, 0);
 						fclose(f);
-						return;	/* skip if not newer */
+						return(0);/* skip if !newer */
 					}
 				}
 			}
@@ -303,7 +349,7 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 		} else if (fresh) {	/* else if freshening */
 			fseek(arc, starts, 0);	/* then do not add files */
 			fclose(f);
-			return;
+			return(0);
 		} else {	/* else adding a new file */
 			if (note) {
 				printf("Adding file:   %-12s  ", name);
@@ -314,7 +360,7 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 	} else {		/* no existing archive */
 		if (fresh) {	/* cannot freshen nothing */
 			fclose(f);
-			return;
+			return(0);
 		} else if (note) {	/* else adding a file */
 			printf("Adding file:   %-12s  ", name);
 			fflush(stdout);
@@ -324,10 +370,13 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 	starts = ftell(new);	/* note where header goes */
 	hdrver = ARCVER;		/* anything but end marker */
 	writehdr(&nhdr, new);	/* write out header skeleton */
+#if	_MTS
+	atoe(nhdr.name, FNLEN); /* writehdr translated this... */
+#endif
 	pack(f, new, &nhdr);	/* pack file into archive */
-	strcpy(nhdr.name, name);
 	fseek(new, starts, 0);	/* move back to header skeleton */
 	writehdr(&nhdr, new);	/* write out real header */
 	fseek(new, nhdr.size, 1);	/* skip over data to next header */
 	fclose(f);		/* all done with the file */
+	return(0);
 }

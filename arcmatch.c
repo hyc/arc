@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcmatch.c,v 1.1 1988/06/02 00:41:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcmatch.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -19,16 +19,19 @@
 #include <stdio.h>
 #include "arc.h"
 
-int	strcmp(), strlen();
-void	abort();
-char	*strcpy();
+#include <string.h>
+#if	BSD
+#include <strings.h>
+#endif
+
+VOID	arcdie();
 
 int
 match(n, t)			/* test name against template */
 	char           *n;	/* name to test */
 	char           *t;	/* template to test against */
 {
-#if	MTS
+#if	_MTS
 	fortran         patbuild(), patmatch(), patfree();
 	static int      patlen = (-1);
 	static int      patwork = 0;
@@ -46,7 +49,7 @@ match(n, t)			/* test name against template */
 		patbuild(oldtemp, &patlen, &patwork, &patswch, patccid, patchar, _retcode RETCODE);
 		if (RETCODE > 8) {
 			printf("MTS: patbuild returned %d\n", RETCODE);
-			abort("bad wildcard in filename");
+			arcdie("bad wildcard in filename");
 		}
 	}
 	namlen = strlen(n);
@@ -57,7 +60,7 @@ match(n, t)			/* test name against template */
 	case 4:
 		return (0);
 	default:
-		abort("wildcard pattern match failed");
+		arcdie("wildcard pattern match failed");
 	}
 }
 
@@ -66,9 +69,7 @@ match(n, t)			/* test name against template */
 	upper(n);
 	upper(t);		/* avoid case problems */
 #endif	/* UNIX */
-#if	GEMDOS
-	return(pnmatch(n, t, 0));
-#else
+
 	/* first match name part */
 
 	while ((*n && *n != '.') || (*t && *t != '.')) {
@@ -108,16 +109,15 @@ match(n, t)			/* test name against template */
 	}
 
 	return 1;		/* match worked */
-#endif	/* GEMDOS */
 }
 #endif
 
-void
+VOID
 rempath(nargs, arg)		/* remove paths from filenames */
 	int             nargs;	/* number of names */
 	char           *arg[];	/* pointers to names */
 {
-	char           *i, *rindex();	/* string index, reverse indexer */
+	char           *i;	/* string index */
 	int             n;	/* index */
 
 	for (n = 0; n < nargs; n++) {	/* for each supplied name */

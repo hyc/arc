@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcpack.c,v 1.1 1988/06/02 21:27:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcpack.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCPACK
@@ -19,47 +19,50 @@
 */
 #include <stdio.h>
 #include "arc.h"
-#if	MTS
+#if	_MTS
 #include <ctype.h>
 #endif
 
-void	setcode(), sqinit_cm(), sqputc_cm(), init_cm(), putc_cm();
-void	filecopy(), abort(), putc_tst();
-int	getch(), addcrc();
+#include "proto.h"
+
+VOID		setcode(), init_cm(), codebuf();
+VOID		arcdie(), init_sq(), flsh_cm();
+int		crcbuf();
+u_int		ncr_buf();
+
+int		lastc;
 
 /* stuff for non-repeat packing */
 
 #define DLE 0x90		/* repeat sequence marker */
 
-static unsigned char state;	/* current packing state */
+u_char	state;		/* current packing state */
 
 /* non-repeat packing states */
 
-#define NOHIST  0		/* don't consider previous input */
+#define NOHIST	0		/* don't consider previous input */
 #define SENTCHAR 1		/* lastchar set, no lookahead yet */
-#define SENDNEWC 2		/* run over, send new char next */
-#define SENDCNT 3		/* newchar set, send count next */
+
+extern	u_char	*pinbuf;
+extern	u_char	*pakbuf;	/* worst case, 2*inbuf */
 
 /* packing results */
 
-static long     stdlen;		/* length for standard packing */
-static short    crcval;		/* CRC check value */
+long		stdlen;		/* length for standard packing */
+short		crcval;		/* CRC check value */
 
-void
+VOID
 pack(f, t, hdr)			/* pack file into an archive */
-	FILE           *f, *t;	/* source, destination */
+	FILE	       *f, *t;	/* source, destination */
 	struct heads   *hdr;	/* pointer to header data */
 {
-	int             c;	/* one character of stream */
-	long            ncrlen;	/* length after packing */
-	long		huflen;	/* length after squeezing */
-	long            lzwlen;	/* length after crunching */
-	long		pred_sq(), file_sq();	/* stuff for squeezing */
-	long            pred_cm(), sqpred_cm();	/* dynamic crunching cleanup */
-	long            tloc, ftell();	/* start of output */
-	int		getch();
-	int             getc_ncr();
-	void            putc_pak();
+	long		ncrlen; /* length after packing */
+	long		huflen; /* length after squeezing */
+	long		lzwlen; /* length after crunching */
+	long		pred_sq(), head_sq(), huf_buf();	/* stuff for squeezing */
+	long		pred_cm();	/* dynamic crunching cleanup */
+	long		tloc, ftell();	/* start of output */
+	u_int		inbytes, pakbytes;
 
 	/* first pass - see which method is best */
 
@@ -70,32 +73,32 @@ pack(f, t, hdr)			/* pack file into an archive */
 			printf(" analyzing, ");
 			fflush(stdout);
 		}
-		state = NOHIST;	/* initialize ncr packing */
+		state = NOHIST; /* initialize ncr packing */
 		stdlen = ncrlen = 0;	/* reset size counters */
+		huflen = lzwlen = 0;
 		crcval = 0;	/* initialize CRC check value */
 		setcode();	/* initialize encryption */
 		init_sq();	/* initialize for squeeze scan */
 
-		if (dosquash) {
-			sqinit_cm();
-			while ((c = getch(f)) != EOF) {	/* for each byte of file */
-				ncrlen++;	/* one more packed byte */
-				scan_sq(c);	/* see what squeezing can do */
-				sqputc_cm(c, t);	/* see what squashing
-							 * can do */
+		inbytes = getbuf(f);
+		if (inbytes) {
+
+			init_cm(pinbuf);
+
+			for (;; inbytes = getbuf(f)) {
+				pakbytes = ncr_buf(inbytes);
+				ncrlen += pakbytes;
+				hufb_tab(pakbuf, pakbytes);
+				if (dosquash)
+					lzw_buf(pinbuf, inbytes, t);
+				else
+					lzw_buf(pakbuf, pakbytes, t);
+				if (inbytes < MYBUF)
+					break;
 			}
-			lzwlen = sqpred_cm(t);
-		} else {
-			init_cm(t);	/* initialize for crunching */
-	
-			while ((c = getc_ncr(f)) != EOF) {	/* for each byte of file */
-				ncrlen++;	/* one more packed byte */
-				scan_sq(c);	/* see what squeezing can do */
-				putc_cm(c, t);	/* see what crunching can do */
-			}
-			lzwlen = pred_cm(t);	/* finish up after crunching */
+			lzwlen = pred_cm(t);
+			huflen = pred_sq();
 		}
-		huflen = pred_sq();	/* finish up after squeezing */
 	} else {		/* else kludge the method */
 		stdlen = 0;	/* make standard look best */
 		ncrlen = huflen = lzwlen = 1;
@@ -103,17 +106,20 @@ pack(f, t, hdr)			/* pack file into an archive */
 
 	/* standard set-ups common to all methods */
 
-	fseek(f, 0L, 0);	/* rewind input */
 	hdr->crc = crcval;	/* note CRC check value */
 	hdr->length = stdlen;	/* set actual file length */
-	state = NOHIST;		/* reinitialize ncr packing */
-	setcode();		/* reinitialize encryption */
+	if (stdlen > MYBUF) {
+		fseek(f, 0L, 0);/* rewind input */
+		state = NOHIST; /* reinitialize ncr packing */
+		setcode();	/* reinitialize encryption */
+	} else
+		inbytes = stdlen;
 
 	/* choose and use the shortest method */
 
 	if (kludge && note)
-		printf("\n\tS:%ld  P:%ld  S:%ld  C:%ld,\t ",
-			stdlen, ncrlen, huflen, lzwlen);
+		printf("\n\tS:%ld  P:%ld  S:%ld	 C:%ld,\t ",
+		       stdlen, ncrlen, huflen, lzwlen);
 
 	if (stdlen <= ncrlen && stdlen <= huflen && stdlen <= lzwlen) {
 		if (note) {
@@ -122,21 +128,30 @@ pack(f, t, hdr)			/* pack file into an archive */
 		}
 		hdrver = 2;	/* note packing method */
 		fseek(t, tloc, 0);	/* reset output for new method */
-		stdlen = crcval = 0;	/* recalc these for kludge */
-		while ((c = getch(f)) != EOF)	/* store it straight */
-			putc_pak(c, t);
+		if (nocomp || (stdlen > MYBUF)) {
+			stdlen = crcval = 0;
+			while ((inbytes = getbuf(f)) != 0)
+				putb_pak(pinbuf, inbytes, t); /* store it straight */
+		} else
+			putb_pak(pinbuf, inbytes, t);
 		hdr->crc = crcval;
 		hdr->length = hdr->size = stdlen;
 	} else if (ncrlen < lzwlen && ncrlen < huflen) {
 		if (note) {
-			printf("packing, ");	/* pack with repeat
-			fflush(stdout);		 * suppression */
+			printf("packing, ");	/* pack with repeat */
+			fflush(stdout); /* suppression */
 		}
 		hdrver = 3;	/* note packing method */
 		hdr->size = ncrlen;	/* set data length */
 		fseek(t, tloc, 0);	/* reset output for new method */
-		while ((c = getc_ncr(f)) != EOF)
-			putc_pak(c, t);
+		if (stdlen > MYBUF) {
+			do {
+				inbytes = getbuf(f);
+				pakbytes = ncr_buf(inbytes);
+				putb_pak(pakbuf, pakbytes, t);
+			} while (inbytes != 0);
+		} else
+			putb_pak(pakbuf, pakbytes, t);
 	} else if (huflen < lzwlen) {
 		if (note) {
 			printf("squeezing, ");
@@ -144,10 +159,21 @@ pack(f, t, hdr)			/* pack file into an archive */
 		}
 		hdrver = 4;	/* note packing method */
 		fseek(t, tloc, 0);	/* reset output for new method */
-		hdr->size = file_sq(f, t);	/* note final size */
+		huflen = head_sq();
+		if (stdlen > MYBUF) {
+			do {
+				inbytes = getbuf(f);
+				pakbytes = ncr_buf(inbytes);
+				huflen += huf_buf(pakbuf, pakbytes, inbytes, t);
+			} while (inbytes != 0);
+		} else
+			huflen += huf_buf(pakbuf, pakbytes, 0, t);
+
+		hdr->size = huflen;	/* note final size */
 	} else {
 		if (note)
 			printf(dosquash ? "squashed, " : "crunched, ");
+		flsh_cm(t);
 		hdrver = dosquash ? 9 : 8;
 		hdr->size = lzwlen;	/* size should not change */
 	}
@@ -155,120 +181,121 @@ pack(f, t, hdr)			/* pack file into an archive */
 	/* standard cleanups common to all methods */
 
 	if (note)
-		printf("done. (%ld%%)\n",100L - (100L*hdr->size)/hdr->length);
+		printf("done. (%ld%%)\n", hdr->length == 0 ?
+		       0L : 100L - (100L * hdr->size) / hdr->length);
 }
 
 /*
  * Non-repeat compression - text is passed through normally, except that a
  * run of more than two is encoded as:
- * 
+ *
  * <char> <DLE> <count>
- * 
+ *
  * Special case: a count of zero indicates that the DLE is really a DLE, not a
  * repeat marker.
  */
 
-int
-getc_ncr(f)			/* get bytes with collapsed runs */
-	FILE           *f;	/* file to get from */
+u_int
+ncr_buf(inbytes)
+	u_int		inbytes;	/* number of bytes in inbuf */
 {
-	static int      lastc;	/* value returned on last call */
-	static int      repcnt;	/* repetition counter */
-	static int      c;	/* latest value seen */
+	u_int		i;
+	int		c;
+	reg u_char     *inptr, *pakptr;
+	static int	cnt;
 
-	switch (state) {	/* depends on our state */
-	case NOHIST:		/* no relevant history */
+	inptr = pinbuf;
+	pakptr = pakbuf;
+
+	if (state == NOHIST) {
+		lastc = (-1);
+		cnt = 1;
 		state = SENTCHAR;
-		return lastc = getch(f);	/* remember the value next
-						 * time */
-
-	case SENTCHAR:		/* char was sent. look ahead */
-		switch (lastc) {/* action depends on char */
-		case DLE:	/* if we sent a real DLE */
-			state = NOHIST;	/* then start over again */
-			return 0;	/* but note that the DLE was real */
-
-		case EOF:	/* EOF is always a special case */
-			return EOF;
-
-		default:	/* else test for a repeat */
-			for (repcnt = 1; (c = getch(f)) == lastc && repcnt < 255; repcnt++);
-			/* find end of run */
-
-			switch (repcnt) {	/* action depends on run size */
-			case 1:/* not a repeat */
-				return lastc = c;	/* but remember value
-							 * next time */
-
-			case 2:/* a repeat, but too short */
-				state = SENDNEWC;	/* send the second one
-							 * next time */
-				return lastc;
-
-			default:	/* a run - compress it */
-				state = SENDCNT;	/* send repeat count
-							 * next time */
-				return DLE;	/* send repeat marker this
-						 * time */
+	}
+	for (i = 0; i < inbytes; i++) {
+		c = *inptr++;
+		if (c == lastc && cnt < 255)
+			cnt++;
+		else {
+			if (cnt == 2) {
+				*pakptr++ = lastc;
+			} else if (cnt > 2) {
+				*pakptr++ = DLE;
+				*pakptr++ = cnt;
 			}
+			*pakptr++ = c;
+			lastc = c;
+			cnt = 1;
 		}
-
-	case SENDNEWC:		/* send second char of short run */
-		state = SENTCHAR;
-		return lastc = c;
-
-	case SENDCNT:		/* sent DLE, now send count */
-		state = SENDNEWC;
-		return repcnt;
-
-	default:
-		abort("Bug - bad ncr state\n");
+		if (c == DLE) {
+			*pakptr++ = '\0';
+			lastc = (-1);
+		}
 	}
+	if (inbytes < MYBUF && cnt > 1) {	/* trailing stuff */
+		if (cnt == 2)
+			*pakptr++ = lastc;
+		else {
+			*pakptr++ = DLE;
+			*pakptr++ = cnt;
+		}
+	}
+	return (pakptr - pakbuf);
 }
 
-int
-getch(f)			/* special get char for packing */
-	FILE           *f;	/* file to get from */
+u_int
+getbuf(f)
+	FILE	       *f;
 {
-	int		c;	/* a char from the file */
+	u_int		i;
 #if	!DOS
-	static int      cr = 0;	/* add \r before \n ? */
-
-	if (cr) {
-		c = '\n';
-#if	MTS
-		c = toascii(c);
+	int		c;
+	static int	cr = 0;
+	register u_char *ptr;
+	if (image) {
 #endif
-		crcval = addcrc(crcval, c);
-		stdlen++;
-		cr = 0;
-		return (c);
-	}
-#endif
-
-	if ((c = fgetc(f)) != EOF) {	/* if not the end of file */
+		i = fread(pinbuf, 1, MYBUF, f);
 #if	!DOS
-		if (!image && (c == '\n')) {
-			c = '\r';
-			cr = 1;
+	} else {
+		ptr = pinbuf;
+		for (i = 0, c = 0; (c != EOF) && (i < MYBUF); i++) {
+			if (cr) {
+				c = '\n';
+				cr = 0;
+			} else {
+				c = fgetc(f);
+				if (c == EOF)
+					break;
+				else if (c == '\n') {
+					c = '\r';
+					cr = 1;
+				}
+			}
+			*ptr++ = c;
 		}
-#endif
-#if	MTS
-		if (!image)
-			c = toascii(c);
-#endif
-		crcval = addcrc(crcval, c);	/* then update CRC check
-						 * value */
-		stdlen++;	/* and bump length counter */
+#if	_MTS
+		etoa(pinbuf, i);
+#endif				/* _MTS */
 	}
-	return c;
+#endif				/* !DOS */
+	crcval = crcbuf(crcval, i, pinbuf);
+	stdlen += i;
+	return (i);
 }
 
-void
-putc_pak(c, f)			/* put a packed byte into archive */
-	char            c;	/* byte to put */
-	FILE           *f;	/* archive to put it in */
+VOID
+putb_pak(buf, len, f)
+	u_char	       *buf;
+	u_int		len;
+	FILE	       *f;
 {
-	unsigned char		code();
-	putc_tst(code(c), f);	/* put encoded byte, with checks */
+	u_int		i;
+
+	if (f && len) {
+		if (password)
+			codebuf(buf, len);
+		i = fwrite(buf, 1, len, f);
+		if (i != len)
+			arcdie("Write failed");
+	}
 }

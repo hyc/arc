@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arc.c,v 1.1 1988/06/17 22:03:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility
@@ -73,16 +73,34 @@
 #include <stdio.h>
 #include "arc.h"
 
-int		strlen();
-void		addarc(), delarc(), extarc(), lstarc(), tstarc(), cvtarc(), runarc();
-void		abort();
-#if	MTS
-void		etoa();
+#if	UNIX
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
+
+#include <string.h>
+#if BSD
+#include <strings.h>
+#endif
+
+#if	!__STDC__
+char		*calloc(), *malloc(), *realloc();
+#endif
+
+VOID		addarc(), delarc(), extarc(), lstarc(), tstarc(), cvtarc(), runarc();
+VOID		arcdie();
+static	VOID	expandlst();
+#if	_MTS
+VOID		etoa();
 #endif
 #if	GEMDOS
-long		_stksize = 24576;
+long		_stksize = 30720;
 #endif
-char		*strcpy(), *strcat();
+char		*makefnam();	/* filename fixup routine */
+
+	/* Block I/O buffers */
+
+u_char		*pinbuf, *pakbuf, *outbuf, *outend;
 
 static char   **lst;		/* files list */
 static int	lnum;		/* length of files list */
@@ -93,22 +111,24 @@ main(num, arg)			/* system entry point */
 {
 	char		opt = 0;/* selected action */
 	char	       *a;	/* option pointer */
-	char	       *makefnam();	/* filename fixup routine */
-	void		upper();/* case conversion routine */
-	char	       *index();/* string index utility */
+	VOID		upper();/* case conversion routine */
 	char	       *envfind();	/* environment searcher */
 	int		n;	/* index */
-	char	       *arctemp2, *calloc(), *mktemp();
+	char	       *arctemp2, *mktemp();
 #if	GEMDOS
-	void		exitpause();
+	VOID		exitpause();
+	int		append;
 #endif
-#if	MTS
-	fortran void	guinfo();
+#if	_MTS
+	fortran VOID	guinfo();
 	char		gotinf[4];
+#endif
+#if	UNIX
+	struct	stat	sbuf;
 #endif
 
 	if (num < 3) {
-		printf("ARC - Archive utility, Version 5.21, created on 04/22/87 at 15:05:21\n");
+		printf("ARC - Archive utility, Version 5.21i, created on 11/25/92 at 14:40:55\n");
 /*		printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 		printf(" ALL RIGHTS RESERVED\n\n");
 		printf("Please refer all inquiries to:\n\n");
@@ -141,7 +161,7 @@ main(num, arg)			/* system entry point */
 #if	UNIX
 		printf("Usage: arc {amufdxerplvtc}[biswnoq][g<password>]");
 #endif
-#if	MTS
+#if	_MTS
 		printf("Parameters: {amufdxeplvtc}[biswnoq][g<password>]");
 #endif
 		printf(" <archive> [<filename> . . .]\n");
@@ -151,7 +171,7 @@ main(num, arg)			/* system entry point */
 		printf("	 f   = freshen files in archive\n");
 		printf("	 d   = delete files from archive\n");
 		printf("	 x,e = extract files from archive\n");
-#if	!MTS
+#if	!_MTS
 		printf("	 r   = run files from archive\n");
 #endif
 		printf("	 p   = copy files from archive to");
@@ -164,7 +184,7 @@ main(num, arg)			/* system entry point */
 #if	GEMDOS
 		printf("	 h   = hold screen after finishing\n");
 #endif
-#if	MTS
+#if	_MTS
 		printf("	 i   = suppress ASCII/EBCDIC translation\n");
 #endif
 #if	UNIX
@@ -188,7 +208,7 @@ main(num, arg)			/* system entry point */
 		return 1;
 	}
 	/* see where temp files go */
-#if	!MTS
+#if	!_MTS
 	arctemp = calloc(1, STRLEN);
 	if (!(arctemp2 = envfind("ARCTEMP")))
 		arctemp2 = envfind("TMPDIR");
@@ -198,8 +218,14 @@ main(num, arg)			/* system entry point */
 		if (arctemp[n - 1] != CUTOFF)
 			arctemp[n] = CUTOFF;
 	}
+#if	UNIX
+	else	strcpy(arctemp, "/tmp/");
+#endif
 #if	!MSDOS
-	strcat(arctemp, mktemp("AXXXXXX"));
+	{
+		static char tempname[] = "AXXXXXX";
+		strcat(arctemp, mktemp(tempname));
+	}
 #else
 	strcat(arctemp, "$ARCTEMP");
 #endif
@@ -211,6 +237,7 @@ main(num, arg)			/* system entry point */
 	arctemp = "-$$$";
 	arctemp[0] = tmpchr[0];
 #endif
+	arctemp2 = NULL;
 
 #if	!UNIX
 	/* avoid any case problems with arguments */
@@ -223,7 +250,17 @@ main(num, arg)			/* system entry point */
 #endif
 
 	/* create archive names, supplying defaults */
-	makefnam(arg[2], ".arc", arcname);
+#if	UNIX
+	if (!stat(arg[2],&sbuf)) {
+		if ((sbuf.st_mode & S_IFMT) == S_IFDIR)
+			makefnam(arg[2],".arc",arcname);
+		else
+			strcpy(arcname,arg[2]);
+	} else
+		makefnam(arg[2],".arc",arcname);
+#else
+	makefnam(arg[2], ".ARC", arcname);
+#endif
 	/* makefnam(".$$$",arcname,newname); */
 	sprintf(newname, "%s.arc", arctemp);
 	makefnam(".BAK", arcname, bakname);
@@ -231,13 +268,13 @@ main(num, arg)			/* system entry point */
 	/* now scan the command and see what we are to do */
 
 	for (a = arg[1]; *a; a++) {	/* scan the option flags */
-#if	!MTS
+#if	!_MTS
 		if (index("AMUFDXEPLVTCR", *a)) {	/* if a known command */
 #else
 		if (index("AMUFDXEPLVTC", *a)) {
 #endif
 			if (opt)/* do we have one yet? */
-				abort("Cannot mix %c and %c", opt, *a);
+				arcdie("Cannot mix %c and %c", opt, *a);
 			opt = *a;	/* else remember it */
 		} else if (*a == 'B')	/* retain backup copy */
 			keepbak = 1;
@@ -264,7 +301,7 @@ main(num, arg)			/* system entry point */
 			while (*a)
 				a++;
 			a--;
-#if	MTS
+#if	_MTS
 			etoa(password, strlen(password));
 #endif
 		} else if (*a == 'S')	/* storage kludge */
@@ -281,11 +318,11 @@ main(num, arg)			/* system entry point */
 			;
 
 		else
-			abort("%c is an unknown command", *a);
+			arcdie("%c is an unknown command", *a);
 	}
 
 	if (!opt)
-		abort("I have nothing to do!");
+		arcdie("I have nothing to do!");
 
 	/* get the files list set up */
 
@@ -298,10 +335,36 @@ main(num, arg)			/* system entry point */
 	for (n = 0; n < lnum;) {/* expand indirect references */
 		if (*lst[n] == '@')
 			expandlst(n);
+#if	GEMDOS		/* redirect stdout from the desktop...*/
+		else if (*lst[n] == '>') {
+			arctemp2 = (++lst[n]);
+			lst[n] = lst[--lnum];	/* delete this entry */
+			if (arctemp2[0] == '>') {
+				append = 1;
+				arctemp2++;
+			}
+			else	append = 0;
+		}
+#endif
 		else
 			n++;
 	}
+#if	GEMDOS
+	if (arctemp2)
+		freopen(arctemp2,append ? "a" : "w",stdout);
+#endif
 
+	/* Allocate space to I/O buffers */
+
+	if (!(pinbuf = malloc(MYBUF)))
+		arcdie("Not enough memory for input buffer.");
+	if (!(outbuf = malloc(MYBUF)))
+		arcdie("Not enough memory for output buffer.");
+	if (!(pakbuf = malloc(2L*MYBUF)))
+		arcdie("Not enough memory for packing buffer.");
+	outend = outbuf + MYBUF - 1;
+	
+	
 	/* act on whatever action command was given */
 
 	switch (opt) {		/* action depends on command */
@@ -335,13 +398,13 @@ main(num, arg)			/* system entry point */
 	case 'C':		/* Convert */
 		cvtarc(lnum, lst);
 		break;
-#if	!MTS
+#if	!_MTS
 	case 'R':		/* Run */
 		runarc(lnum, lst);
 		break;
 #endif
 	default:
-		abort("I don't know how to do %c yet!", opt);
+		arcdie("I don't know how to do %c yet!", opt);
 	}
 #if	GEMDOS
 	if (hold)
@@ -349,12 +412,11 @@ main(num, arg)			/* system entry point */
 #endif
 	return nerrs;
 }
-static
+static	VOID
 expandlst(n)			/* expand an indirect reference */
 	int		n;	/* number of entry to expand */
 {
 	FILE	       *lf, *fopen();	/* list file, opener */
-	char	       *malloc(), *realloc();	/* memory managers */
 	char		buf[100];	/* input buffer */
 	int		x;	/* index */
 	char	       *p = lst[n] + 1; /* filename pointer */
@@ -362,7 +424,7 @@ expandlst(n)			/* expand an indirect reference */
 	if (*p) {		/* use name if one was given */
 		makefnam(p, ".CMD", buf);
 		if (!(lf = fopen(buf, "r")))
-			abort("Cannot read list of files in %s", buf);
+			arcdie("Cannot read list of files in %s", buf);
 	} else
 		lf = stdin;	/* else use standard input */
 
@@ -372,7 +434,7 @@ expandlst(n)			/* expand an indirect reference */
 
 	while (fscanf(lf, "%99s", buf) > 0) {	/* read in the list */
 		if (!(lst =(char **)realloc(lst, (lnum + 1) * sizeof(char *))))
-			abort("too many file references");
+			arcdie("too many file references");
 
 		lst[lnum] = malloc(strlen(buf) + 1);
 		strcpy(lst[lnum], buf); /* save the name */

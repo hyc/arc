@@ -9,7 +9,7 @@
  *  -- Howard Chu, August 1 1988      hyc@umix.cc.umich.edu, umix!hyc
  */
 
-/* $Header: /cvsroot/arc/arc/tmclock.c,v 1.1 2003/10/31 00:49:07 highlandsun Exp $ */
+/* $Header: /cvsroot/arc/arc/tmclock.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $ */
 
 /* Julian day number of the Unix* clock's origin, 01 Jan 1970. */
 #define JD1970 2440587L

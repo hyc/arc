@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arccvt.c,v 1.1 1988/06/02 00:18:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arccvt.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -17,14 +17,19 @@
  * Language: Computer Innovations Optimizing C86
  */
 #include <stdio.h>
+#if	_MTS
+#include <mts.h>
+#endif
 #include "arc.h"
 
-void	openarc(), rempath(), closearc(), abort(), pack(), writehdr(), filecopy();
 int	match(), readhdr(), unpack(), unlink();
+VOID	openarc(), rempath(), closearc(), arcdie(), pack();
+VOID	writehdr(), filecopy();
+static	VOID	cvtfile();
 
 static char     tempname[STRLEN];	/* temp file name */
 
-void
+VOID
 cvtarc(num, arg)		/* convert archive */
 	int             num;	/* number of arguments */
 	char           *arg[];	/* pointers to arguments */
@@ -35,7 +40,6 @@ cvtarc(num, arg)		/* convert archive */
 	int             n;	/* index */
 	char           *makefnam();	/* filename fixer */
 	FILE           *fopen();/* file opener */
-	void            cvtfile();
 
 	if (arctemp)		/* use temp area if specified */
 		sprintf(tempname, "%s.CVT", arctemp);
@@ -88,7 +92,7 @@ cvtarc(num, arg)		/* convert archive */
 	}
 }
 
-void
+static	VOID
 cvtfile(hdr)			/* convert a file */
 	struct heads   *hdr;	/* pointer to header data */
 {
@@ -96,7 +100,7 @@ cvtfile(hdr)			/* convert a file */
 	FILE           *tmp, *fopen();	/* temporary file */
 
 	if (!(tmp = fopen(tempname, "w+b")))
-		abort("Unable to create temporary file %s", tempname);
+		arcdie("Unable to create temporary file %s", tempname);
 
 	if (note) {
 		printf("Converting file: %-12s   reading, ", hdr->name);
@@ -108,6 +112,9 @@ cvtfile(hdr)			/* convert a file */
 	starts = ftell(new);	/* note where header goes */
 	hdrver = ARCVER;		/* anything but end marker */
 	writehdr(hdr, new);	/* write out header skeleton */
+#if	_MTS
+	atoe(hdr->name, FNLEN);	/* writehdr translated this... */
+#endif
 	pack(tmp, new, hdr);	/* pack file into archive */
 	fseek(new, starts, 0);	/* move back to header skeleton */
 	writehdr(hdr, new);	/* write out real header */

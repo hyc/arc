@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcdata.c,v 1.1 1988/06/13 09:26:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcdata.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCDATA
@@ -27,7 +27,7 @@ int             keepbak = 0;	/* true if saving the old archive */
 #if	UNIX
 int		image = 1;	/* true to suppress CRLF/LF x-late */
 #endif
-#if	MTS
+#if	_MTS
 int             image = 0;	/* true to suppress EBCDIC/ASCII x-late */
 char            sepchr[2] = ":";/* Shared file separator */
 char            tmpchr[2] = "-";/* Temporary file prefix */

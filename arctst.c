@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arctst.c,v 1.1 1988/04/19 06:40:00 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arctst.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
  */
 
 /*
@@ -18,10 +18,10 @@
 #include <stdio.h>
 #include "arc.h"
 
-void	openarc();
+VOID	openarc();
 int	readhdr(), unpack();
 
-void
+VOID
 tstarc()
 {				/* test integrity of an archive */
 	struct heads    hdr;	/* file header */
