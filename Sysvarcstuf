@@ -1,0 +1,659 @@
+To: Howard_Chu%um.cc.umich.edu%umix.uucp@umix.cc.umich.edu
+Date: Fri, 15 Apr 88 19:12:24 EST
+From: Jon Zeeff <zeeff%b-tech.UUCP@umix.cc.umich.edu>
+In-Reply-To: Message from "um.cc.umich.edu!Howard_Chu" of Apr 15
+X-Mailer: Elm [version 1.7]
+Message-Id: <8804151912.AA00417@b-tech.UUCP>
+ 
+ 
+Here is what I believe to be all the routines needed to run your arc on
+Sys V.3.  Sys V.2 people will also need the directory routines that
+were posted in comp.sources.unix Vol 9 as gwyn-dir-lib.
+ 
+ 
+#! /bin/sh
+# This is a shell archive.  Remove anything before this line, then unpack
+# it by saving it into a file and typing "sh file".  To overwrite existing
+# files, type "sh file -c".  You can also feed this as standard input via
+# unshar, or by typing "sh <file", e.g..  If this archive is complete, you
+# will see the following message at the end:
+#             "End of shell archive."
+# Contents:  getwd.c scandir.sh utimes.c
+# Wrapped by root@b-tech on Fri Apr 15 19:05:49 1988
+PATH=/bin:/usr/bin:/usr/ucb ; export PATH
+if test -f getwd.c -a "${1}" != "-c" ; then
+  echo shar: Will not over-write existing file \"getwd.c\"
+else
+echo shar: Extracting \"getwd.c\" \(726 characters\)
+sed "s/^X//" >getwd.c <<'END_OF_getwd.c'
+X/*
+X * 4.2bsd getwd simulation for Sys V.3
+X */
+X
+X#include <stdio.h>
+X
+X#define SYSV3
+X
+X#define MAXWD 1024           /* limited by 4.2 getwd(2) */
+X
+X#ifdef SYSV3
+X
+Xchar *getcwd();
+X
+Xchar *
+Xgetwd(path)
+Xchar *path;
+X{
+X    return(getcwd(path,MAXWD));
+X}
+X
+X#else
+X
+X/*
+X * 4.2bsd getwd simulation for Sys V.2
+X */
+X
+X#include <stdio.h>
+X
+X#define MAXWD 1024           /* limited by 4.2 getwd(2) */
+X
+Xchar *
+Xgetwd(path)
+Xchar *path;
+X{
+X     char *nlp;
+X     FILE *fp;
+X     FILE *popen();
+X     char *strrchr();
+X
+X        putenv("IFS= \t\n");
+X     fp = popen("PATH=/bin:/usr/bin pwd", "r");
+X     if (fp == NULL)
+X             return 0;
+X     if (fgets(path, MAXWD, fp) == NULL) {
+X             (void) pclose(fp);
+X             return 0;
+X     }
+X     if ((nlp = strrchr(path, '\n')) != NULL)
+X             *nlp = '\0';
+X     (void) pclose(fp);
+X     return path;
+X}
+X#endif
+X
+END_OF_getwd.c
+if test 726 -ne `wc -c <getwd.c`; then
+    echo shar: \"getwd.c\" unpacked with wrong size!
+fi
+# end of overwriting check
+fi
+if test -f scandir.sh -a "${1}" != "-c" ; then
+  echo shar: Will not over-write existing file \"scandir.sh\"
+else
+echo shar: Extracting \"scandir.sh\" \(13502 characters\)
+sed "s/^X//" >scandir.sh <<'END_OF_scandir.sh'
+XPath: uunet!husc6!hao!oddjob!gargoyle!ihnp4!cbosgd!mandrill!hal!ncoast!allbery
+XFrom: rsalz@pebbles.bbn.com
+XNewsgroups: comp.sources.misc
+XSubject: scandir, ftw REDUX
+XMessage-ID: <6943@ncoast.UUCP>
+XDate: 1 Jan 88 00:47:01 GMT
+XSender: allbery@ncoast.UUCP
+XLines: 505
+XApproved: allbery@ncoast.UUCP
+XX-Archive: comp.sources.misc/8712/15
+X
+XForget my previous message -- I just decided for completeness's sake to
+Ximplement the SysV ftw(3) routine, too.
+X
+XTo repeat, these are public-domain implementations of the SystemV ftw()
+Xroutine, the BSD scandir() and alphasort() routines, and documentation for
+Xsame.  The FTW manpage could be more readable, but so it goes.
+X
+XAnyhow, feel free to post these, and incorporate them into your existing
+Xpackages.  I have readdir() routiens for MSDOS and the Amiga if anyone
+Xwants them, and should have them for VMS by the end of January; let me
+Xknow if you want copies.
+X
+XYours in filesystems,
+X     /r$
+X
+XAnyhow, feel free to post
+X#! /bin/sh
+X# This is a shell archive.  Remove anything before this line, then unpack
+X# it by saving it into a file and typing "sh file".  To overwrite existing
+X# files, type "sh file -c".  You can also feed this as standard input via
+X# unshar, or by typing "sh <file", e.g..  If this archive is complete, you
+X# will see the following message at the end:
+X#            "End of shell archive."
+X# Contents:  alphasort.c ftw.3 ftw.c ftw.h scandir.3 scandir.c
+X# Wrapped by rsalz@fig.bbn.com on Tue Dec 29 21:39:01 1987
+XPATH=/bin:/usr/bin:/usr/ucb ; export PATH
+Xif test -f 'alphasort.c' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'alphasort.c'\"
+Xelse
+Xecho shar: Extracting \"'alphasort.c'\" \(425 characters\)
+Xsed "s/^X//" >'alphasort.c' <<'END_OF_FILE'
+XX/*
+XX**  ALPHASORT
+XX**  Trivial sorting predicate for scandir; puts entries in alphabetical order.
+XX*/
+XX#include <sys/types.h>
+XX#include <sys/dir.h>
+XX#ifdef      RCSID
+XXstatic char RCS[] = "$Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $";
+XX#endif      /* RCSID */
+XX
+XX/* A convenient shorthand. */
+XXtypedef struct direct        ENTRY;
+XX
+XXint
+XXalphasort(d1, d2)
+XX    ENTRY   **d1;
+XX    ENTRY   **d2;
+XX{
+XX    return(strcmp(d1[0]->d_name, d2[0]->d_name));
+XX}
+XEND_OF_FILE
+Xif test 425 -ne `wc -c <'alphasort.c'`; then
+X    echo shar: \"'alphasort.c'\" unpacked with wrong size!
+Xfi
+X# end of 'alphasort.c'
+Xfi
+Xif test -f 'ftw.3' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'ftw.3'\"
+Xelse
+Xecho shar: Extracting \"'ftw.3'\" \(2139 characters\)
+Xsed "s/^X//" >'ftw.3' <<'END_OF_FILE'
+XX.TH FTW 3
+XX.\" $Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $
+XX.SH NAME
+XXftw \- walk a file tree
+XX.SH SYNOPSIS
+XX.ft B
+XX.nf
+XX#include <ftw.h>
+XX
+XXint
+XXftw(directory, funcptr, depth)
+XX    char *directory;
+XX    int (*funcptr)();
+XX    int depth;
+XX
+XX#include <sys/stat.h>
+XX
+XXint
+XXfuncptr(item, sb, flag)
+XX    char *item;
+XX    struct stat *sb;
+XX    int flag;
+XX.fi
+XX.ft R
+XX.SH DESCRIPTION
+XX.I Ftw
+XXwalks through the directory tree starting from the indicated
+XX.IR path .
+XXFor every entry it finds in the tree, it calls the user-supplied
+XX.I funcptr
+XXwith the calling sequence given in the synopsis above.
+XXThe first argument is the full pathname of the entry (rooted from
+XXthe
+XX.I directory
+XXparameter given to
+XX.IR ftw );
+XXthe second argument is a pointer to the
+XX.IR stat (2)
+XXstructure for the entry;
+XXand the third argument is one of the #define's in the header file.
+XXThis value will be one of the following:
+XX.RS
+XX.ta \w'FTW_DNR  'u
+XX.nf
+XXFTW_F       Item is a normal file
+XXFTW_D       Item is a directory
+XXFTW_NS      The stat failed on the item
+XXFTW_DNR     Item is a directory which can't be read
+XX.fi
+XX.RE
+XXNote, however, that FTW_F is a misnomer; anything other than directories
+XXare (e.g., symbolic links) get the FTW_F tag.
+XX.PP
+XX.I Ftw
+XXrecursively calls itself when it encounters a directory.
+XXTo avoid using up all a program's file descriptors, the
+XX.I depth
+XXargument specifies the number of simultaneous open directories to maintain.
+XXWhen the depth is exceeded, the routine will become noticeably
+XXslower because directories are closed in ``most-recently-used'' order.
+XX.PP
+XXTo stop the tree walk, the user-supplied function should return a
+XXnon\-zero value; this value will become the return value of
+XX.IR ftw .
+XXOtherwise,
+XX.I ftw
+XXwill continue until it has scanned the entire tree, in which case it will
+XXreturn zero, or until it hits an error such as a
+XX.IR malloc (3)
+XXfailure, in which case it will return \-1.
+XX.PP
+XXBecause
+XX.I ftw
+XXuses dynamic data structures, the only safe way to exit out of a tree
+XXwalk is to return a non-zero value.
+XXTo handle interrupts, for example, mark that the interrupt occured
+XXand return a non\-zero value\(em don't use
+XX.I longjmp (3)
+XXunless the program is going to terminate.
+XX.SH SEE ALSO
+XXstat(2)
+XEND_OF_FILE
+Xif test 2139 -ne `wc -c <'ftw.3'`; then
+X    echo shar: \"'ftw.3'\" unpacked with wrong size!
+Xfi
+X# end of 'ftw.3'
+Xfi
+Xif test -f 'ftw.c' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'ftw.c'\"
+Xelse
+Xecho shar: Extracting \"'ftw.c'\" \(2455 characters\)
+Xsed "s/^X//" >'ftw.c' <<'END_OF_FILE'
+XX/*
+XX**  FTW
+XX**  Walk a directory hierarchy from a given point, calling a user-supplied
+XX**  function at each thing we find.  If we go below a specified depth,
+XX**  recycle file descriptors.
+XX*/
+XX#include <stdio.h>
+XX#include <sys/types.h>
+XX#include <sys/stat.h>
+XX#include <sys/dir.h>
+XX#include <ftw.h>
+XX#ifdef      RCSID
+XXstatic char RCS[] = "$Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $";
+XX#endif      /* RCSID */
+XX
+XX/* Handy shorthand. */
+XX#define EQ(a, b)    (strcmp((a), (b)) == 0)
+XX
+XX/* Linked in later. */
+XXextern char         *malloc();
+XXextern char         *strcpy();
+XX
+XX
+XXint
+XXftw(directory, funcptr, depth)
+XX    char             *directory;
+XX    int                     (*funcptr)();
+XX    int                       depth;
+XX{
+XX    register DIR     *Dp;
+XX    register char    *p;
+XX    register int      i;
+XX    struct direct    *E;
+XX    struct stat               Sb;
+XX    long              seekpoint;
+XX    char             *fullpath;
+XX
+XX    /* If can't stat, tell the user so. */
+XX    if (stat(directory, &Sb) < 0)
+XX    return((*funcptr)(directory, &Sb, FTW_NS));
+XX
+XX    /* If it's not a directory, call the user's function. */
+XX    if ((Sb.st_mode & S_IFMT) != S_IFDIR)
+XX    /* Saying "FTW_F" here is lying, what if this is a symlink? */
+XX    return((*funcptr)(directory, &Sb, FTW_F));
+XX
+XX    /* Open directory; and if we can't tell the user so. */
+XX    if ((Dp = opendir(directory)) == NULL)
+XX    return((*funcptr)(directory, &Sb, FTW_DNR));
+XX
+XX    /* See if user wants to go further. */
+XX    if (i = (*funcptr)(directory, &Sb, FTW_D)) {
+XX    closedir(Dp);
+XX    return(i);
+XX    }
+XX
+XX    /* Get ready to hold the full paths. */
+XX    i = strlen(directory);
+XX    if ((fullpath = malloc(i + 1 + MAXNAMLEN + 1)) == NULL) {
+XX    closedir(Dp);
+XX    return(-1);
+XX    }
+XX    (void)strcpy(fullpath, directory);
+XX    p = &fullpath[i];
+XX    if (i && p[-1] != '/')
+XX    *p++ = '/';
+XX
+XX    /* Read all entries in the directory.. */
+XX    while (E = readdir(Dp))
+XX    if (!EQ(E->d_name, ".") && !EQ(E->d_name, "..")) {
+XX        if (depth <= 1) {
+XX            /* Going too deep; checkpoint and close this directory. */
+XX            seekpoint = telldir(Dp);
+XX            closedir(Dp);
+XX            Dp = NULL;
+XX        }
+XX
+XX        /* Process the file. */
+XX        (void)strcpy(p, E->d_name);
+XX        if (i = ftw(fullpath, funcptr, depth - 1)) {
+XX            /* User's finished; clean up. */
+XX            free(fullpath);
+XX            if (Dp)
+XX                closedir(Dp);
+XX            return(i);
+XX        }
+XX
+XX        /* Reopen the directory if necessary. */
+XX        if (Dp == NULL) {
+XX            if ((Dp = opendir(directory)) == NULL) {
+XX                /* WTF? */
+XX                free(fullpath);
+XX                return(-1);
+XX            }
+XX            seekdir(Dp, seekpoint);
+XX        }
+XX    }
+XX
+XX    /* Clean up. */
+XX    free(fullpath);
+XX    closedir(Dp);
+XX    return(0);
+XX}
+XEND_OF_FILE
+Xif test 2455 -ne `wc -c <'ftw.c'`; then
+X    echo shar: \"'ftw.c'\" unpacked with wrong size!
+Xfi
+X# end of 'ftw.c'
+Xfi
+Xif test -f 'ftw.h' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'ftw.h'\"
+Xelse
+Xecho shar: Extracting \"'ftw.h'\" \(358 characters\)
+Xsed "s/^X//" >'ftw.h' <<'END_OF_FILE'
+XX/*
+XX**  <FTW.H>
+XX**  Header values for the third parameter to the user-supplied function
+XX**  for ftw().
+XX**
+XX**  $Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $
+XX*/
+XX
+XX#define FTW_NS              100     /* Something stat(2) failed on          */
+XX#define FTW_DNR             200     /* Something opendir(3) failed on       */
+XX#define FTW_F               300     /* A normal file                        */
+XX#define FTW_D               400     /* A directory                          */
+XEND_OF_FILE
+Xif test 358 -ne `wc -c <'ftw.h'`; then
+X    echo shar: \"'ftw.h'\" unpacked with wrong size!
+Xfi
+X# end of 'ftw.h'
+Xfi
+Xif test -f 'scandir.3' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'scandir.3'\"
+Xelse
+Xecho shar: Extracting \"'scandir.3'\" \(2350 characters\)
+Xsed "s/^X//" >'scandir.3' <<'END_OF_FILE'
+XX.TH SCANDIR 3
+XX.\" $Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $
+XX.SH NAME
+XXscandir, alphasort \- scan a directory
+XX.SH SYNOPSIS
+XX.nf
+XX.ft B
+XX#include <sys/types.h>
+XX#include <sys/dir.h>
+XX
+XXint
+XXscandir(name, list, selector, sorter)
+XX.in +4n
+XXchar *name;
+XXstruct direct ***list;
+XXint (*selector)();
+XXint (*sorter)();
+XX.in -4n
+XX
+XXint
+XXalphasort(d1, d2)
+XX.in +4n
+XXstruct direct **d1;
+XXstruct direct **d2;
+XX.in -4n
+XX.ft R
+XX.fi
+XX.SH DESCRIPTION
+XX.I Scandir
+XXreads the directory
+XX.I name
+XXand builds a NULL\-terminated array of pointers to the entries found
+XXin that directory.
+XXThis array is put into the location pointed to by the
+XX.I list
+XXparameter.
+XX.PP
+XXIf the
+XX.I selector
+XXparameter is non\-NULL, it is taken to be a pointer to a function called
+XXwith each entry, to determine whether or not it should be included in
+XXthe returned list.
+XXIf the parameter is NULL, all entries are included.
+XX.PP
+XXAs an added feature, the entries can be sorted (with
+XX.IR qsort (3))
+XXbefore the list is returned.
+XXIf the
+XX.I sorter
+XXparameter is non\-NULL, it is passed to qsort to use as the comparison
+XXfunction.
+XXThe
+XX.I alphasort
+XXroutine is provided to sort the array alphabetically.
+XX.PP
+XXThe array pointed to by
+XX.I list
+XXand the items it points to are all space obtained through
+XX.IR malloc (3),
+XXand their storage can be reclaimed as shown in the example below.
+XX.SH "EXAMPLE"
+XXHere is a small
+XX.IR ls (1)\-like
+XXprogram:
+XX.ne 50
+XX.RS
+XX.nf
+XX#include <stdio.h>
+XX#include <sys/types.h>
+XX#include <sys/stat.h>
+XX#include <sys/dir.h>
+XX
+XXextern int alphasort();
+XX
+XXstatic int
+XXfilesonly(e)
+XX    struct direct *e;
+XX{
+XX    struct stat sb;
+XX
+XX    return(stat(e->d_name, &sb) >= 0 && (sb.st_mode & S_IFMT) == S_IFREG);
+XX}
+XX
+XXmain(ac, av)
+XX    int ac;
+XX    char *av[];
+XX{
+XX    register int i;
+XX    register int j;
+XX    struct direct **list;
+XX
+XX    if (ac != 2) {
+XX            fprintf(stderr, "usage: %s dirname\n", av[0]);
+XX            exit(1);
+XX    }
+XX    if (chdir(av[1]) < 0) {
+XX            perror(av[1]);
+XX            exit(1);
+XX    }
+XX    if ((i = scandir(".", &list, filesonly, alphasort)) < 0) {
+XX            perror("Error reading directory");
+XX            exit(1);
+XX    }
+XX    for (j = 0; j < i; j++)
+XX            printf("%s\n", list[j]->d_name);
+XX    for (j = 0; j < i; j++)
+XX            free((char *)list[j]);
+XX    free((char *)list);
+XX    exit(0);
+XX}
+XX.fi
+XX.RE
+XX.SH "SEE ALSO"
+XXdirectory(3), qsort(3)
+XX.SH DIAGNOSTICS
+XXReturns the number of entries in the ``list,'' or \-1 if the directory
+XXcould not be opened or a memory allocation failed.
+XX.SH BUGS
+XXThe routine can be slightly wasteful of space.
+XEND_OF_FILE
+Xif test 2350 -ne `wc -c <'scandir.3'`; then
+X    echo shar: \"'scandir.3'\" unpacked with wrong size!
+Xfi
+X# end of 'scandir.3'
+Xfi
+Xif test -f 'scandir.c' -a "${1}" != "-c" ; then
+X  echo shar: Will not clobber existing file \"'scandir.c'\"
+Xelse
+Xecho shar: Extracting \"'scandir.c'\" \(1777 characters\)
+Xsed "s/^X//" >'scandir.c' <<'END_OF_FILE'
+XX/*
+XX**  SCANDIR
+XX**  Scan a directory, collecting all (selected) items into a an array.
+XX*/
+XX#include <sys/types.h>
+XX#include <sys/dir.h>
+XX#ifdef      RCSID
+XXstatic char RCS[] = "$Header: /cvsroot/arc/arc/Sysvarcstuf,v 1.1 1988/06/13 09:09:00 highlandsun Exp $";
+XX#endif      /* RCSID */
+XX
+XX/* Initial guess at directory size. */
+XX#define INITIAL_SIZE        20
+XX
+XX/* A convenient shorthand. */
+XXtypedef struct direct        ENTRY;
+XX
+XX/* Linked in later. */
+XXextern char         *malloc();
+XXextern char         *realloc();
+XXextern char         *strcpy();
+XX
+XX
+XXint
+XXscandir(Name, List, Selector, Sorter)
+XX    char              *Name;
+XX    ENTRY           ***List;
+XX    int                      (*Selector)();
+XX    int                      (*Sorter)();
+XX{
+XX    register ENTRY   **names;
+XX    register ENTRY    *E;
+XX    register DIR      *Dp;
+XX    register int       i;
+XX    register int       size;
+XX
+XX    /* Get initial list space and open directory. */
+XX    size = INITIAL_SIZE;
+XX    if ((names = (ENTRY **)malloc(size * sizeof names[0])) == NULL
+XX     || (Dp = opendir(Name)) == NULL)
+XX    return(-1);
+XX
+XX    /* Read entries in the directory. */
+XX    for (i = 0; E = readdir(Dp); )
+XX    if (Selector == NULL || (*Selector)(E)) {
+XX        /* User wants them all, or he wants this one. */
+XX        if (++i >= size) {
+XX            size <<= 1;
+XX            names = (ENTRY **)realloc((char *)names, size * sizeof names[0]);
+XX            if (names == NULL) {
+XX                closedir(Dp);
+XX                return(-1);
+XX            }
+XX        }
+XX
+XX        /* Copy the entry. */
+XX        if ((names[i - 1] = (ENTRY *)malloc(DIRSIZ(E))) == NULL) {
+XX            closedir(Dp);
+XX            return(-1);
+XX        }
+XX        names[i - 1]->d_ino = E->d_ino;
+XX        names[i - 1]->d_reclen = E->d_reclen;
+XX        names[i - 1]->d_namlen = E->d_namlen;
+XX        (void)strcpy(names[i - 1]->d_name, E->d_name);
+XX    }
+XX
+XX    /* Close things off. */
+XX    names[i] = NULL;
+XX    *List = names;
+XX    closedir(Dp);
+XX
+XX    /* Sort? */
+XX    if (i && Sorter)
+XX    qsort((char *)names, i, sizeof names[0], Sorter);
+XX
+XX    return(i);
+XX}
+XEND_OF_FILE
+Xif test 1777 -ne `wc -c <'scandir.c'`; then
+X    echo shar: \"'scandir.c'\" unpacked with wrong size!
+Xfi
+X# end of 'scandir.c'
+Xfi
+Xecho shar: End of shell archive.
+Xexit 0
+END_OF_scandir.sh
+if test 13502 -ne `wc -c <scandir.sh`; then
+    echo shar: \"scandir.sh\" unpacked with wrong size!
+fi
+# end of overwriting check
+fi
+if test -f utimes.c -a "${1}" != "-c" ; then
+  echo shar: Will not over-write existing file \"utimes.c\"
+else
+echo shar: Extracting \"utimes.c\" \(373 characters\)
+sed "s/^X//" >utimes.c <<'END_OF_utimes.c'
+X
+X/* bsd utimes emulation for Sys V */
+X/* by Jon Zeeff */
+X
+X#include <sys/types.h>
+X
+Xstruct utimbuf {
+X     time_t  actime;
+X     time_t  modtime;
+X};
+X
+Xstruct timeval {
+X     long    tv_sec;
+X     long    tv_usec;
+X};
+X
+Xutimes(path,tvp)
+Xchar *path;
+Xstruct timeval tvp[2];
+X{
+X
+Xstruct utimbuf times;
+X
+Xtimes.actime = (time_t) tvp[0].tv_sec;
+Xtimes.modtime = (time_t) tvp[1].tv_sec;
+X
+Xreturn utime(path,times);
+X
+X}
+END_OF_utimes.c
+if test 373 -ne `wc -c <utimes.c`; then
+    echo shar: \"utimes.c\" unpacked with wrong size!
+fi
+# end of overwriting check
+fi
+echo shar: End of shell archive.
+exit 0
+
