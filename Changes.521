@@ -1,0 +1,47 @@
+                        CHANGES IN VERSION 5.21
+
+
+The following changes have been made in ARC version 5.21, but have not
+yet been included in the manual:
+
+o   When adding files to an archive, ARC now shows the stowage facter
+    achieved on each file.
+
+o   A bug was found that would keep an archive entry from being
+    encrypted if it was stored without compression.  This has now been
+    fixed.
+
+o   If changes are made to a corrupted archive, the corrupted entries
+    are discarded.  This makes it possible to lose data accidentally.
+    ARC will now only make changes to a corrupted archive if the W
+    (suppress Warnings) option has been given.
+
+o   The N (suppress Notes) option now suppresses the "Creating
+    archive" note when a new archive is being created.
+
+o   The N (suppress Notes) option formerly did nothing useful when
+    used with the L (List files) command.  It now causes a terse
+    listing of filenames only, suitable for use with pipes and
+    redirection.
+
+o   The list of filenames given to ARC may now include indirect
+    references.  If a filename begins with an "at sign" ("@"), it is
+    taken to be the name of a file which contains a list of file
+    names.  The list of file names may include further indirection.
+    If no extension is given, ".CMD" is assumed.  For example, the
+    command:
+
+         arc a waste junk.txt @trash
+
+    would cause ARC to add JUNK.TXT plus all files listed in the file
+    TRASH.CMD to an archive named WASTE.ARC.  If no file is specified,
+    then the list is read from standard input.  For example, the
+    command:
+
+         arc ln waste | arc a trash @
+
+    would cause ARC to add files to TRASH.ARC based on the names of
+    the files stored in WASTE.ARC.  It is probably a good idea to give
+    the O (Overwrite) option if you are extracting files this way.
+
+    Version 5.21 of MARC also allows for indirection.
