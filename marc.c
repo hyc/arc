@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.3 2004/11/06 11:16:26 k_reimer Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -105,7 +105,8 @@ char *arg[];			       /* pointers to arguments */
 	if (!(arctemp2 = envfind("ARCTEMP")))
 		arctemp2 = envfind("TMPDIR");
 	if (arctemp2) {
-		strcpy(arctemp, arctemp2);
+		strncpy(arctemp, arctemp2, STRLEN - 16);
+		arctemp[STRLEN - 17] = '\0';
 		n = strlen(arctemp);
 		if (arctemp[n - 1] != CUTOFF)
 			arctemp[n] = CUTOFF;
@@ -129,6 +130,13 @@ char *arg[];			       /* pointers to arguments */
 	arctemp = "-$$$";
 	arctemp[0] = tmpchr[0];
 #endif
+
+	for (n = 1; n < nargs; n++)
+	  if (strlen(arg[n]) > (STRLEN - 16))
+	  {
+	    fprintf(stderr, "Too long argument: %s\n", arg[n]);
+	    exit(235);
+	  }
 
 #if	UNIX
 	if (!stat(arg[1],&sbuf))

@@ -1,3 +1,11 @@
+                        CHANGES IN VERSION 5.21k
+                 (Klaus Reimer <k@ailis.de>, 6 Nov 2004)
+                        
+Ulf Harnhammar found some buffer overflows causing segfaults and provided a
+patch which is now applied to arc to close these bugs.
+
+
+
                         CHANGES IN VERSION 5.21
 
 
