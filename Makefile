@@ -1,8 +1,11 @@
-# $Header: /cvsroot/arc/arc/Makefile,v 1.4 2003/10/31 02:32:51 highlandsun Exp $
+# $Header: /cvsroot/arc/arc/Makefile,v 1.5 2004/11/06 11:25:21 k_reimer Exp $
 #       Makefile for portable ARC
 #
 # Originals from Dan Lanciani, James Turner, and others...
 # This Makefile supports Atari ST and all Unix versions.
+
+# This version is needed for the dist target
+VERSION = 5.21k
 #
 # I put SRCDIR on a real disk on the ST, but copy the makefile to a
 # RAMdisk and compile from there. Makes things go a bit quicker...
@@ -118,3 +121,10 @@ arcusq.o:	$(SRCDIR)arcusq.c	$(HEADER)
 
 tmclock.o:	$(SRCDIR)tmclock.c
 	$(CC) $(CFLAGS) -c $(SRCDIR)tmclock.c
+
+dist: clean
+	mkdir -p .dist/arc-$(VERSION)
+	cp -rf * .dist/arc-$(VERSION)
+	rm -rf .dist/arc-$(VERSION)/CVS .dist/arc-$(VERSION)/*.tar.gz
+	cd .dist; tar cfz ../arc-$(VERSION).tar.gz arc-$(VERSION)
+	rm -rf .dist
