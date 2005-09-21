@@ -1,3 +1,13 @@
+                        CHANGES IN VERSION 5.21m
+                 (Klaus Reimer <k@ailis.de>, 21 Sep 2005)
+
+Applied patch from Joey Hess fixing the following problems:
+  
+  - Fixed insecure permissions of a temporary file [arcsvc.c, CAN-2005-2945]
+  - Fixed insecure temporary file creation [arcsvc.c, CAN-2005-2992]
+
+
+
                         CHANGES IN VERSION 5.21l
                  (Klaus Reimer <k@ailis.de>, 13 Mar 2005)
                         

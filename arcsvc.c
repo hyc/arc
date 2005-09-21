@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.3 2005/09/21 15:40:46 k_reimer Exp $
  */
 
 /*  ARC - Archive utility - ARCSVC
@@ -17,6 +17,9 @@
 	 Computer Innovations Optimizing C86
 */
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "arc.h"
 #if	_MTS
 #include <mts.h>
@@ -52,7 +55,12 @@ openarc(chg)			/* open archive */
 	}
 #endif
 	if (chg) {		/* if opening for changes */
-		if (!(new = fopen(newname, OPEN_W)))
+		int fd;
+
+		if ((fd = open(newname, O_CREAT|O_EXCL|O_RDWR, S_IREAD|S_IWRITE)) == -1)
+			arcdie("Cannot create archive copy: %s", newname);
+
+		if (!(new = fdopen(fd, OPEN_W)))
 			arcdie("Cannot create archive copy: %s", newname);
 
 	changing = chg;		/* note if open for changes */
