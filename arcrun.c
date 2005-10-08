@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.3 2005/03/13 15:44:00 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.4 2005/10/08 15:45:29 highlandsun Exp $
  */
 
 /*
@@ -25,7 +25,6 @@
 VOID	rempath(), openarc(), closearc(), arcdie();
 int	readhdr(), match(), unpack();
 static	VOID	runfile();
-char	*strcat();
 
 VOID
 runarc(num, arg)		/* run file from archive */
