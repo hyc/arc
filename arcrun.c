@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.4 2005/10/08 15:45:29 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.5 2005/10/08 20:24:37 highlandsun Exp $
  */
 
 /*
@@ -119,7 +119,7 @@ runfile(hdr, num, arg)		/* run a file */
 #endif
 
 	if (warn)
-		if (tmp = fopen(buf, "r"))
+		if ((tmp = fopen(buf, "r")))
 			arcdie("Temporary file %s already exists", buf);
 	if (!(tmp = fopen(buf, OPEN_W)))
 		arcdie("Unable to create temporary file %s", buf);

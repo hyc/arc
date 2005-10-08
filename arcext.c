@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcext.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcext.c,v 1.3 2005/10/08 20:24:37 highlandsun Exp $
  */
 
 /*
@@ -144,7 +144,7 @@ extfile(hdr, path, prt)		/* extract a file */
 		printf("Extracting file: %s\n", fix);
 
 	if (warn && !overlay) {
-		if (f = fopen(fix, "r")) {	/* see if it exists */
+		if ((f = fopen(fix, "r"))) {	/* see if it exists */
 				fclose(f);
 				printf("WARNING: File %s already exists!", fix);
 				fflush(stdout);

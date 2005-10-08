@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arclzw.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arclzw.c,v 1.3 2005/10/08 20:24:37 highlandsun Exp $
  */
 
 /*
@@ -663,7 +663,7 @@ eolist(index)			/* find last duplicate */
 {
 	int             temp;
 
-	while (temp = string_tab[index].next)	/* while more duplicates */
+	while ((temp = string_tab[index].next))	/* while more duplicates */
 		index = temp;
 
 	return index;

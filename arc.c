@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arc.c,v 1.3 2004/11/06 11:16:26 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/arc.c,v 1.4 2005/10/08 20:24:37 highlandsun Exp $
  */
 
 /*  ARC - Archive utility
@@ -105,6 +105,7 @@ u_char		*pinbuf, *pakbuf, *outbuf, *outend;
 static char   **lst;		/* files list */
 static int	lnum;		/* length of files list */
 
+int
 main(num, arg)			/* system entry point */
 	int		num;	/* number of arguments */
 	char	       *arg[];	/* pointers to arguments */
