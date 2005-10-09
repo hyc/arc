@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcpack.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcpack.c,v 1.3 2005/10/09 02:14:47 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCPACK
@@ -62,7 +62,7 @@ pack(f, t, hdr)			/* pack file into an archive */
 	long		pred_sq(), head_sq(), huf_buf();	/* stuff for squeezing */
 	long		pred_cm();	/* dynamic crunching cleanup */
 	long		tloc, ftell();	/* start of output */
-	u_int		inbytes, pakbytes;
+	u_int		inbytes = 0, pakbytes = 0;
 
 	/* first pass - see which method is best */
 
