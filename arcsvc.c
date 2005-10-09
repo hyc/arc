@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.3 2005/09/21 15:40:46 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/arcsvc.c,v 1.4 2005/10/09 01:38:22 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCSVC
@@ -24,6 +24,8 @@
 #if	_MTS
 #include <mts.h>
 #endif
+
+#include "proto.h"
 
 VOID	arcdie(), setstamp();
 int	unlink();
@@ -55,12 +57,7 @@ openarc(chg)			/* open archive */
 	}
 #endif
 	if (chg) {		/* if opening for changes */
-		int fd;
-
-		if ((fd = open(newname, O_CREAT|O_EXCL|O_RDWR, S_IREAD|S_IWRITE)) == -1)
-			arcdie("Cannot create archive copy: %s", newname);
-
-		if (!(new = fdopen(fd, OPEN_W)))
+		if (!(new = tmpopen(newname)))
 			arcdie("Cannot create archive copy: %s", newname);
 
 	changing = chg;		/* note if open for changes */

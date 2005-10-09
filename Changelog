@@ -1,3 +1,10 @@
+                        CHANGES IN VERSION 5.21n
+                 (Howard Chu <hyc@highlandsun.com>, 08 Oct 2005)
+
+Better fix for temporary file creations, previous patch did not fix marc.
+Silence all gcc-4.0.0 -Wall warnings.
+
+
                         CHANGES IN VERSION 5.21m
                  (Klaus Reimer <k@ailis.de>, 21 Sep 2005)
 

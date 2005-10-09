@@ -1,6 +1,6 @@
 /*
  * Miscellaneous routines to get ARC running on non-MSDOS systems...
- * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.3 2003/10/31 02:32:19 highlandsun Exp $ 
+ * $Header: /cvsroot/arc/arc/arcmisc.c,v 1.4 2005/10/09 01:38:22 highlandsun Exp $ 
  */
 
 #include <stdio.h>
@@ -67,6 +67,7 @@ chdir(dirname)
 #endif
 #include <sys/stat.h>
 	int	rename(), unlink();
+#include <fcntl.h>
 #endif
 
 #if	NEEDMEMSET
@@ -91,6 +92,17 @@ int		free();
 #endif
 #endif
 int             match();
+
+/* Safe open for temp files */
+FILE *
+tmpopen(path)
+	char *path;
+{
+	int fd = open(path, O_CREAT | O_WRONLY | O_EXCL, S_IRUSR | S_IWUSR);
+	if (fd < 0 )
+		return NULL;
+	return fdopen(fd, OPEN_W);
+}
 
 int
 move(oldnam, newnam)
@@ -306,7 +318,7 @@ dir(filename)		/* get files, one by one */
 
 	if (Nnum == 0) {	/* first call */
 		strcpy(namecopy,filename);
-		if(pattern=rindex(namecopy,CUTOFF)) {
+		if((pattern=rindex(namecopy,CUTOFF))) {
 			*pattern = 0;
 			pattern++;
 			dirname = namecopy;

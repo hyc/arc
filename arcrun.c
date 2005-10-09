@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.5 2005/10/08 20:24:37 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.6 2005/10/09 01:38:22 highlandsun Exp $
  */
 
 /*
@@ -21,6 +21,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "arc.h"
+#if UNIX
+#include <unistd.h>
+#include <sys/stat.h>
+#endif
 
 VOID	rempath(), openarc(), closearc(), arcdie();
 int	readhdr(), match(), unpack();
@@ -130,7 +134,9 @@ runfile(hdr, num, arg)		/* run a file */
 	dir = gcdir("");	/* see where we are */
 	unpack(arc, tmp, hdr);	/* unpack the entry */
 	fclose(tmp);		/* release the file */
-	chmod(buf, "700");	/* make it executable */
+#if UNIX
+	chmod(buf, 0700);	/* make it executable */
+#endif
 #if	GEMDOS
 	execve(buf, arg, NULL);
 #else

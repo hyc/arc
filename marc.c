@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.4 2005/03/13 15:44:00 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.5 2005/10/09 01:38:22 highlandsun Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -29,13 +29,17 @@
 #if	UNIX
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
+
+#include "proto.h"
 
 #ifndef	__STDC__
 char *calloc(), *malloc(), *realloc(); /* memory managers */
 #endif
-VOID	arcdie();
-static VOID expandlst(), merge();
+int gethdr(), match(), readhdr();
+VOID	arcdie(), filecopy(), setstamp(), writehdr();
+static VOID copyfile(), expandlst(), merge();
 
 FILE *src;			       /* source archive */
 char srcname[STRLEN];		       /* source archive name */
@@ -118,6 +122,7 @@ char *arg[];			       /* pointers to arguments */
 #if	!MSDOS
 	{
 		static char tempname[] = "AXXXXXX";
+		/* This name is used safely, ignore linker warnings. */
 		strcat(arctemp, mktemp(tempname));
 	}
 #else
@@ -158,7 +163,7 @@ char *arg[];			       /* pointers to arguments */
     arc = fopen(arcname,OPEN_R);	       /* open the archives */
     if(!(src=fopen(srcname,OPEN_R)))
 	 arcdie("Cannot read source archive %s",srcname);
-    if(!(new=fopen(newname,OPEN_W)))
+    if(!(new=tmpopen(newname)))
 	 arcdie("Cannot create new archive %s",newname);
 
     if(!arc)
@@ -295,6 +300,7 @@ struct heads *hdr;		       /* storage for header */
     else return 0;		       /* or fake end of archive */
 }
 
+static VOID
 copyfile(f,hdr,ver)		       /* copy a file from an archive */
 FILE *f;			       /* archive to copy from */
 struct heads *hdr;		       /* header data for file */

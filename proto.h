@@ -7,3 +7,7 @@ VOID	 lzw_buf PROTO ((u_char *buf, u_int len, FILE *f));
 VOID	putb_unp PROTO ((u_char *buf, u_int len, FILE *f));
 VOID	putb_ncr PROTO ((u_char *buf, u_int len, FILE *f));
 VOID	putb_pak PROTO ((u_char *buf, u_int len, FILE *f));
+VOID	upper PROTO ((char *string));
+int		move PROTO ((char *oldnam, char *newnam));
+int		crcbuf PROTO ((int, u_int, u_char *));
+FILE *	tmpopen PROTO ((char *path));

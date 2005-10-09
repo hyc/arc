@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arc.c,v 1.4 2005/10/08 20:24:37 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arc.c,v 1.5 2005/10/09 01:38:22 highlandsun Exp $
  */
 
 /*  ARC - Archive utility
@@ -226,6 +226,7 @@ main(num, arg)			/* system entry point */
 #if	!MSDOS
 	{
 		static char tempname[] = "AXXXXXX";
+		/* This name is used safely, ignore linker warnings. */
 		strcat(arctemp, mktemp(tempname));
 	}
 #else
