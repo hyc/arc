@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcio.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcio.c,v 1.3 2005/10/10 17:07:11 highlandsun Exp $
  */
 
 /*  ARC - Archive utility - ARCIO
@@ -54,7 +54,11 @@ readhdr(hdr, f)			/* read a header from an archive */
 		while (!feof(f)) {
 			try++;
 			if (fgetc(f) == ARCMARK) {
-				ungetc(hdrver = fgetc(f), f);
+				int dummy;
+				/* ungetc is guaranteed to succeed for a single char,
+				 * no need to check result
+				 */
+				dummy = ungetc(hdrver = fgetc(f), f);
 				if (!(hdrver & 0x80) && hdrver <= ARCVER)
 					break;
 			}
@@ -78,7 +82,8 @@ readhdr(hdr, f)			/* read a header from an archive */
 	if (hdrver == 0)
 		return 0;	/* note our end of archive marker */
 	if (hdrver > ARCVER) {
-		fread(name, sizeof(char), FNLEN, f);
+		if (fread(name, sizeof(char), FNLEN, f) != FNLEN)
+			arcdie("%s was truncated", arcname);
 #if	_MTS
 		atoe(name, strlen(name));
 #endif
@@ -90,15 +95,18 @@ readhdr(hdr, f)			/* read a header from an archive */
 	/* amount to read depends on header type */
 
 	if (hdrver == 1) {	/* old style is shorter */
-		fread(hdr, sizeof(struct heads) - sizeof(long int), 1, f);
+		if (fread(hdr, sizeof(struct heads) - sizeof(long int), 1, f) != 1)
+			arcdie("%s was truncated", arcname);
 		hdrver = 2;	/* convert header to new format */
 		hdr->length = hdr->size;	/* size is same when not
 						 * packed */
 	} else
 #if	MSDOS
-		fread(hdr, sizeof(struct heads), 1, f);
+		if (fread(hdr, sizeof(struct heads), 1, f) != 1)
+			arcdie("%s was truncated", arcname);
 #else
-		fread(dummy, 27, 1, f);
+		if (fread(dummy, 27, 1, f) != 1)
+			arcdie("%s was truncated", arcname);
 
 	for (i = 0; i < FNLEN; hdr->name[i] = dummy[i], i++);
 #if	_MTS
@@ -148,13 +156,15 @@ writehdr(hdr, f)		/* write a header to an archive */
 	if (!hdrver)		/* if that's the end */
 		return;		/* then write no more */
 #if	MSDOS
-	fwrite(hdr, sizeof(struct heads), 1, f);
+	if (fwrite(hdr, sizeof(struct heads), 1, f) != 1)
+		arcdie("%s out of space", arcname);
 #else
 	/* byte/word ordering hassles... */
 #if	_MTS
 	etoa(hdr->name, strlen(hdr->name));
 #endif
-	fwrite(hdr->name, 1, FNLEN, f);
+	if (fwrite(hdr->name, 1, FNLEN, f) != FNLEN)
+		arcdie("%s out of space", arcname);
 	put_long(hdr->size, f);
 	put_int(hdr->date, f);
 	put_int(hdr->time, f);

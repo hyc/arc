@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcrun.c,v 1.6 2005/10/09 01:38:22 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcrun.c,v 1.7 2005/10/10 17:07:11 highlandsun Exp $
  */
 
 /*
@@ -29,6 +29,7 @@
 VOID	rempath(), openarc(), closearc(), arcdie();
 int	readhdr(), match(), unpack();
 static	VOID	runfile();
+FILE	*tmpopen();
 
 VOID
 runarc(num, arg)		/* run file from archive */
@@ -68,7 +69,6 @@ runfile(hdr, num, arg)		/* run a file */
 	char           *arg[];	/* pointers to arguments */
 {
 	FILE           *tmp, *fopen();	/* temporary file */
-	char           *dir, *gcdir();	/* directory stuff */
 	char            buf[STRLEN], *makefnam();	/* temp file name, fixer */
 #if	DOS
 	char		nbuf[64], *i, *rindex();
@@ -125,13 +125,12 @@ runfile(hdr, num, arg)		/* run a file */
 	if (warn)
 		if ((tmp = fopen(buf, "r")))
 			arcdie("Temporary file %s already exists", buf);
-	if (!(tmp = fopen(buf, OPEN_W)))
+	if (!(tmp = tmpopen(buf)))
 		arcdie("Unable to create temporary file %s", buf);
 
 	if (note)
 		printf("Invoking file: %s\n", hdr->name);
 
-	dir = gcdir("");	/* see where we are */
 	unpack(arc, tmp, hdr);	/* unpack the entry */
 	fclose(tmp);		/* release the file */
 #if UNIX
@@ -144,10 +143,9 @@ runfile(hdr, num, arg)		/* run a file */
 		strcat(sys, " ");
 		strcat(sys, arg[n]);
 	}
-	system(buf);		/* try to invoke it */
+	if (system(buf))		/* try to invoke it */
+		arcdie("Execution failed for %s", buf);
 #endif
-	chdir(dir);
-	free(dir);		/* return to whence we started */
 	if (unlink(buf) && warn) {
 		printf("Cannot unsave temporary file %s\n", buf);
 		nerrs++;

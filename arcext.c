@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcext.c,v 1.3 2005/10/08 20:24:37 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcext.c,v 1.4 2005/10/10 17:07:11 highlandsun Exp $
  */
 
 /*
@@ -149,9 +149,10 @@ extfile(hdr, path, prt)		/* extract a file */
 				printf("WARNING: File %s already exists!", fix);
 				fflush(stdout);
 				while (1) {
+					char *dummy;
 					printf("  Overwrite it (y/n)? ");
 					fflush(stdout);
-					fgets(buf, STRLEN, stdin);
+					dummy = fgets(buf, STRLEN, stdin);
 					*buf = toupper(*buf);
 					if (*buf == 'Y' || *buf == 'N')
 						break;

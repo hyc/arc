@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcadd.c,v 1.2 2003/10/31 02:22:36 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcadd.c,v 1.3 2005/10/10 17:07:11 highlandsun Exp $
  */
 
 /*
@@ -272,9 +272,10 @@ addfile(path, name, update, fresh)	/* add named file to archive */
 			printf("WARNING: File %s name too long!\n", name);
 			name[FNLEN-1]='\0';
 			while(1) {
+				char *dummy;
 				printf("  Truncate to %s (y/n)? ", name);
 				fflush(stdout);
-				fgets(buf, STRLEN, stdin);
+				dummy = fgets(buf, STRLEN, stdin);
 				*buf = toupper(*buf);
 				if (*buf == 'Y' || *buf == 'N')
 					break;
