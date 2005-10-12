@@ -1,3 +1,9 @@
+                        CHANGES IN VERSION 5.21o
+                 (Howard Chu <hyc@highlandsun.com>, 12 Oct 2005)
+
+Silence warnings about unused results.
+
+
                         CHANGES IN VERSION 5.21n
                  (Howard Chu <hyc@highlandsun.com>, 08 Oct 2005)
 
