@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arcadd.c,v 1.3 2005/10/10 17:07:11 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arcadd.c,v 1.4 2005/10/12 15:22:18 highlandsun Exp $
  */
 
 /*
