@@ -23,6 +23,10 @@
 #include <stdio.h>
 #include "arc.h"
 
+#ifdef __CYGWIN__
+#  include <sys/time.h>
+#endif
+
 #if	MSDOS
 #include "fileio2.h"		/* needed for filehand */
 #endif
