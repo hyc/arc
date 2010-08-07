@@ -1,3 +1,14 @@
+                        CHANGES IN VERSION 5.21p
+                 (Klaus Reimer <k@ailis.de>, 07 Aug 2010)
+
+Replaced mktemp with mkstemp.
+Set correct version number and updated creation date in command-line help.
+Corrected content of PATCHLEVEL file.
+Added man page for marc.
+Added install make target.
+Added -Wall compiler flag.
+
+
                         CHANGES IN VERSION 5.21o
                  (Howard Chu <hyc@highlandsun.com>, 12 Oct 2005)
 

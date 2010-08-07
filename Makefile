@@ -1,11 +1,14 @@
-# $Header: /cvsroot/arc/arc/Makefile,v 1.7 2005/09/21 15:40:46 k_reimer Exp $
+# $Header: /cvsroot/arc/arc/Makefile,v 1.8 2010/08/07 13:06:11 k_reimer Exp $
 #       Makefile for portable ARC
 #
 # Originals from Dan Lanciani, James Turner, and others...
 # This Makefile supports Atari ST and all Unix versions.
 
+# The installation prefix
+PREFIX = /usr/local
+
 # This version is needed for the dist target
-VERSION = 5.21m
+VERSION = 5.21p
 #
 # I put SRCDIR on a real disk on the ST, but copy the makefile to a
 # RAMdisk and compile from there. Makes things go a bit quicker...
@@ -38,7 +41,7 @@ PROG =
 #SYSTEM = -DBSD=1
 SYSTEM = -DSYSV=1
 
-OPT = -O
+OPT = -O -Wall
 # For MWC 3.0 on the Atari ST, use:
 #CFLAGS = -VCOMPAC -VPEEP
 CFLAGS = $(OPT) $(SYSTEM)
@@ -72,7 +75,7 @@ marc$(PROG):	$(MOBJ) $(TMCLOCK)
 	$(CC) $(OPT) -o marc$(PROG) $(MOBJ) $(TMCLOCK) $(LIBS)
 
 clean:
-	-rm *.o arc$(PROG) marc$(PROG)
+	rm -f *.o arc$(PROG) marc$(PROG)
 
 arc.o:	$(SRCDIR)arc.c	$(HEADER)
 	$(CC) $(CFLAGS) -c $(SRCDIR)arc.c
@@ -128,3 +131,10 @@ dist: clean
 	rm -rf .dist/arc-$(VERSION)/CVS .dist/arc-$(VERSION)/*.tar.gz
 	cd .dist; tar cfz ../arc-$(VERSION).tar.gz arc-$(VERSION)
 	rm -rf .dist
+
+install: all
+	install -s -m 0755 -D arc $(DESTDIR)$(PREFIX)/bin/arc
+	install -s -m 0755 -D marc $(DESTDIR)$(PREFIX)/bin/marc
+	install -m 0644 -D arc.1 $(DESTDIR)$(PREFIX)/share/man/man1/arc.1
+	install -m 0644 -D marc.1 $(DESTDIR)$(PREFIX)/share/man/man1/marc.1
+	 	

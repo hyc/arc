@@ -1,0 +1,41 @@
+.TH MARC 1L "25 Nov 1992" "Howard Chu@JPL" "LOCAL COMMANDS"
+.SH NAME
+marc \- archive merger
+.SH SYNOPSIS
+.B marc
+\fItgtarc\fR \fIsrcarc\fR [ \fIfiles\fR ... ]
+.SH DESCRIPTION
+Reads \fIfiles\fR from the arc archive \fIsrcarc\fR and add them to the
+arc archive \fItgtarc\fR.
+.SH HISTORY
+\fIArc\fP has been in use in the CP/M and MSDOS world for many years.
+Thom Henderson developed the original version, but it is important to note that
+\fIarc\fP is based on the file compression theories developed by Huffman, Welch,
+Knott, Knuth, and many other scientists. This implementation is based on
+version 5.21 of the MSDOS program.
+.SH BUGS
+\fIArc\fP behaves just like the PC version of the program; all functions
+of the "usage" display are working.
+Full compatibility with PC ARC files is maintained, the price for which is
+that \fIarc\fP doesn't like long filenames, and can only archive files with
+names of up to 12 characters.
+It will *sometimes* do The Right Thing with them, but I suggest
+you put long-winded filenames in a "shar" before
+.IR arc ing
+them.
+
+There shouldn't be any problems, (hah!) but if you find any, please
+send them to me at:
+
+	hyc@hanauma.jpl.nasa.gov
+
+.SH AUTHORS
+Original MSDOS program by Thom Henderson
+.br
+COPYRIGHT(C) 1985-87 by System Enhancement Associates; ALL RIGHTS RESERVED
+
+Original Lempel-Zev code derived from compress 4.0.
+Modified to support Squashing by Dan Lanciani (ddl@harvard.edu)
+Ported from MSDOS by Howard Chu,
+with help from John Gilmore (hoptoad!gnu), James Turner (daisy!turner)
+and others.

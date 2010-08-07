@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arc.c,v 1.5 2005/10/09 01:38:22 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/arc.c,v 1.6 2010/08/07 13:06:11 k_reimer Exp $
  */
 
 /*  ARC - Archive utility
@@ -76,6 +76,8 @@
 #if	UNIX
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 #endif
 
 #include <string.h>
@@ -115,7 +117,7 @@ main(num, arg)			/* system entry point */
 	VOID		upper();/* case conversion routine */
 	char	       *envfind();	/* environment searcher */
 	int		n;	/* index */
-	char	       *arctemp2, *mktemp();
+	char	       *arctemp2;
 #if	GEMDOS
 	VOID		exitpause();
 	int		append;
@@ -129,7 +131,7 @@ main(num, arg)			/* system entry point */
 #endif
 
 	if (num < 3) {
-		printf("ARC - Archive utility, Version 5.21i, created on 11/25/92 at 14:40:55\n");
+		printf("ARC - Archive utility, Version 5.21p, created on 08/07/2010\n");
 /*		printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 		printf(" ALL RIGHTS RESERVED\n\n");
 		printf("Please refer all inquiries to:\n\n");
@@ -225,9 +227,15 @@ main(num, arg)			/* system entry point */
 #endif
 #if	!MSDOS
 	{
-		static char tempname[] = "AXXXXXX";
-		/* This name is used safely, ignore linker warnings. */
-		strcat(arctemp, mktemp(tempname));
+		strcat(arctemp, "AXXXXXX");
+		int fd = mkstemp(arctemp);
+		if (fd == -1)
+		{
+			fprintf(stderr, "Unable to create temporary files: %s\n", strerror(errno));
+			exit(235);
+		}
+		close(fd);
+		unlink(arctemp);
 	}
 #else
 	strcat(arctemp, "$ARCTEMP");

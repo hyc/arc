@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.5 2005/10/09 01:38:22 highlandsun Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.6 2010/08/07 13:06:11 k_reimer Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 #endif
 
 #include "proto.h"
@@ -56,7 +57,7 @@ char *arg[];			       /* pointers to arguments */
     char *makefnam();
     char *envfind();
 #if	!_MTS
-    char *arctemp2, *mktemp();		/* temp file stuff */
+    char *arctemp2;		       /* temp file stuff */
 #endif
 #if	GEMDOS
     VOID exitpause();
@@ -68,7 +69,7 @@ char *arg[];			       /* pointers to arguments */
 
 
     if(nargs<3)
-    {	 printf("MARC - Archive merger, Version 5.21i, created on 11/25/92 at 14:40:55\n");
+    {	 printf("MARC - Archive merger, Version 5.21p, created on 08/07/2010\n");
 /*	 printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 	 printf(" ALL RIGHTS RESERVED\n\n");
 	 printf("Please refer all inquiries to:\n\n");
@@ -121,9 +122,15 @@ char *arg[];			       /* pointers to arguments */
 #endif
 #if	!MSDOS
 	{
-		static char tempname[] = "AXXXXXX";
-		/* This name is used safely, ignore linker warnings. */
-		strcat(arctemp, mktemp(tempname));
+		strcat(arctemp, "AXXXXXX");
+		int fd = mkstemp(arctemp);
+		if (fd == -1)
+		{
+			fprintf(stderr, "Unable to create temporary files: %s\n", strerror(errno));
+			exit(235);
+		}
+		close(fd);
+		unlink(arctemp);
 	}
 #else
 	strcat(arctemp, "$ARCTEMP");
