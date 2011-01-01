@@ -3,6 +3,7 @@ Unreleased changes:
 Klaus Reimer <k@ailis.de>, 01 Jan 2011:
   * Corrected spelling error in arc man page.
   * Version in binaries now comes from VERSION variable in Makefile.
+  * Changed man page sections from 1L to 1.
 
 
                         CHANGES IN VERSION 5.21p
