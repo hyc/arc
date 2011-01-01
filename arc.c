@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/arc.c,v 1.6 2010/08/07 13:06:11 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/arc.c,v 1.7 2011/01/01 13:02:30 k_reimer Exp $
  */
 
 /*  ARC - Archive utility
@@ -131,7 +131,7 @@ main(num, arg)			/* system entry point */
 #endif
 
 	if (num < 3) {
-		printf("ARC - Archive utility, Version 5.21p, created on 08/07/2010\n");
+		printf("ARC - Archive utility, Version %s, created on 08/07/2010\n", VERSION);
 /*		printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 		printf(" ALL RIGHTS RESERVED\n\n");
 		printf("Please refer all inquiries to:\n\n");

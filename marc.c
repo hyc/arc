@@ -1,5 +1,5 @@
 /*
- * $Header: /cvsroot/arc/arc/marc.c,v 1.6 2010/08/07 13:06:11 k_reimer Exp $
+ * $Header: /cvsroot/arc/arc/marc.c,v 1.7 2011/01/01 13:02:30 k_reimer Exp $
  */
 
 /*  MARC - Archive merge utility
@@ -69,7 +69,7 @@ char *arg[];			       /* pointers to arguments */
 
 
     if(nargs<3)
-    {	 printf("MARC - Archive merger, Version 5.21p, created on 08/07/2010\n");
+    {	 printf("MARC - Archive merger, Version %s, created on 08/07/2010\n", VERSION);
 /*	 printf("(C) COPYRIGHT 1985,86,87 by System Enhancement Associates;");
 	 printf(" ALL RIGHTS RESERVED\n\n");
 	 printf("Please refer all inquiries to:\n\n");
